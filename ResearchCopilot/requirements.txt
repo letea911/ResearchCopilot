@@ -1,2 +1,23 @@
-# ResearchCopilot dependencies
-# Add your project dependencies below
+# Core
+python-dotenv>=1.0.0
+pyyaml>=6.0
+pydantic>=2.0.0
+
+# AI Providers
+openai>=1.0.0
+
+# Storage
+chromadb>=0.5.0
+aisqlite>=0.20.0
+
+# PDF (Phase 2, install now)
+PyMuPDF>=1.23.0
+
+# CLI (Phase 3, install now)
+rich>=13.0.0
+prompt-toolkit>=3.0.0
+click>=8.0.0
+
+# Testing
+pytest>=8.0.0
+pytest-asyncio>=0.23.0
