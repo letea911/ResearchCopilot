@@ -1,0 +1,2 @@
+# ResearchCopilot
+self copilot
