@@ -1,0 +1,2 @@
+# ResearchCopilot dependencies
+# Add your project dependencies below
