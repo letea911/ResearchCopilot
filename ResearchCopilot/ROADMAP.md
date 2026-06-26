@@ -7,8 +7,8 @@
 ## 当前状态
 
 - 📅 最后更新：2026-06-26
-- 🔄 当前阶段：Phase 0 — 架构设计
-- ⏳ 下一里程碑：MVP Literature 模块可运行
+- 🔄 当前阶段：Phase 1 — MVP Core (Storage + AI Providers)
+- ⏳ 下一里程碑：完成 Storage 层实现
 
 ---
 
@@ -33,11 +33,12 @@
 
 **产出物**：[docs/superpowers/specs/2026-06-26-research-copilot-mvp-design.md](docs/superpowers/specs/2026-06-26-research-copilot-mvp-design.md)
 
-### Phase 1: MVP Core — Storage + AI Providers ⬅ 下一步
+### Phase 1: MVP Core — Storage + AI Providers ⬅ 进行中
 
 | 任务 | 状态 | 日期 |
 |---|---|---|
-| Config 层实现 (settings.yaml + .env 加载) | ⬜ | - |
+| 项目依赖 + .env.template | ✅ | 2026-06-26 |
+| Config 层实现 (settings.yaml + .env 加载) | ✅ | 2026-06-26 |
 | BaseLLMProvider 实现 (DeepSeek/OpenAI) | ⬜ | - |
 | BaseEmbeddingProvider 实现 (OpenAI) | ⬜ | - |
 | BaseFileStore 实现 (本地文件系统) | ⬜ | - |
@@ -121,4 +122,4 @@
 
 | 日期 | 关键进展 |
 |---|---|
-| 2026-06-26 | 项目脚手架 + 全栈接口设计 + Spec 定稿 + Git 全局配置 + SSH 同步 GitHub |
+| 2026-06-26 | 项目脚手架 + 全栈接口设计 + Spec 定稿 + Git/SSH 配置 + Phase 1 启动（Task 1-2 完成）|
