@@ -42,7 +42,7 @@
 | ChatMessage 模型 | ✅ | 2026-06-27 |
 | AI Provider 接口 (BaseLLMProvider + BaseEmbeddingProvider) | ✅ | 2026-06-27 |
 | OpenAI LLM Provider 实现 | ✅ | 2026-06-27 |
-| OpenAI Embedding Provider 实现 | ⬜ | - |
+| OpenAI Embedding Provider 实现 | ✅ | 2026-06-27 |
 | BaseFileStore 实现 (本地文件系统) | ⬜ | - |
 | BaseMetadataStore 实现 (SQLite + FTS5) | ⬜ | - |
 | BaseVectorStore 实现 (ChromaDB) | ⬜ | - |

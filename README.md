@@ -36,8 +36,9 @@ AI-powered research literature assistant.
   - ✅ Task 3：ChatMessage 模型（4/4 PASS）
   - ✅ Task 4：AI Provider 接口 — BaseLLMProvider + BaseEmbeddingProvider（5/5 PASS）
   - ✅ Task 5：OpenAI LLM Provider 实现（4/4 PASS）
-- **遇到问题**: 无。Task 5 派发时被意外中断，重新派发后顺利完成
-- **明日计划**: Phase 1 Task 6-8（Embedding Provider → Storage Models → Storage Interfaces）
+  - ✅ Task 6：OpenAI Embedding Provider 实现（3/3 PASS）
+- **遇到问题**: Task 5 派发时被意外中断，重新派发后顺利完成
+- **明日计划**: Phase 1 Task 7-11（Storage Models → Storage Interfaces → 三个 Storage 实现）
 
 ### 2026-06-26
 - **今日目标**: 完成 ResearchCopilot 架构设计 + Phase 1 前两个 Task
