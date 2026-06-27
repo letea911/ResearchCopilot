@@ -6,7 +6,7 @@
 
 ## 当前状态
 
-- 📅 最后更新：2026-06-26
+- 📅 最后更新：2026-06-27
 - 🔄 当前阶段：Phase 1 — MVP Core (Storage + AI Providers)
 - ⏳ 下一里程碑：完成 Storage 层实现
 
@@ -39,12 +39,13 @@
 |---|---|---|
 | 项目依赖 + .env.template | ✅ | 2026-06-26 |
 | Config 层实现 (settings.yaml + .env 加载) | ✅ | 2026-06-26 |
-| BaseLLMProvider 实现 (DeepSeek/OpenAI) | ⬜ | - |
-| BaseEmbeddingProvider 实现 (OpenAI) | ⬜ | - |
+| ChatMessage 模型 | ✅ | 2026-06-27 |
+| AI Provider 接口 (BaseLLMProvider + BaseEmbeddingProvider) | ✅ | 2026-06-27 |
+| OpenAI LLM Provider 实现 | ✅ | 2026-06-27 |
+| OpenAI Embedding Provider 实现 | ⬜ | - |
 | BaseFileStore 实现 (本地文件系统) | ⬜ | - |
 | BaseMetadataStore 实现 (SQLite + FTS5) | ⬜ | - |
 | BaseVectorStore 实现 (ChromaDB) | ⬜ | - |
-| 单元测试 | ⬜ | - |
 
 ### Phase 2: Ingestion Pipeline
 
@@ -122,4 +123,5 @@
 
 | 日期 | 关键进展 |
 |---|---|
-| 2026-06-26 | 项目脚手架 + 全栈接口设计 + Spec 定稿 + Git/SSH 配置 + Phase 1 启动（Task 1-2 完成）|
+| 2026-06-27 | Phase 1 Task 3-5 完成：ChatMessage + Provider Interfaces + OpenAI LLM Provider |
+| 2026-06-26 | 项目脚手架 + 全栈接口设计 + Spec 定稿 + Git/SSH 配置 + Phase 1 Task 1-2 |
