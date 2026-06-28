@@ -31,16 +31,16 @@ AI-powered research literature assistant.
 ## 📋 每日开发日志 (Daily Dev Log)
 
 ### 2026-06-28
-- **今日目标**: Phase 1 Task 7-11 全部完成，结束 Phase 1
+- **今日目标**: Phase 1 Task 7-11 全部完成 + Phase 2 Ingestion Pipeline
 - **完成事项**:
-  - ✅ Task 7：Storage 数据模型 — DocumentRecord, ChunkRecord, VectorDocument, RetrievalResult（5/5 PASS）
-  - ✅ Task 8：Storage 接口 — BaseFileStore, BaseMetadataStore, BaseVectorStore（5/5 PASS）
-  - ✅ Task 9：LocalFileStore 实现（7/7 PASS）
-  - ✅ Task 10：SQLiteMetadataStore 实现 — SQLite + FTS5（9/9 PASS）
-  - ✅ Task 11：ChromaVectorStore 实现（6/6 PASS）
-  - ✅ **Phase 1 全部完成！全量 32/32 PASS**
-- **遇到问题**: chromadb 1.5.9 拒绝空 dict metadata，需转为 None；pytest-asyncio 1.4.0 需显式 @pytest_asyncio.fixture
-- **明日计划**: Phase 2 Ingestion Pipeline（Parser → Normalizer → Chunker → Metadata Extractor）
+  - ✅ **Phase 1 收尾**：Storage Models + Interfaces + FileStore + SQLite + ChromaDB（32/32 PASS）
+  - ✅ **Phase 2-1**：Ingestion Models + Interfaces — Parser, Normalizer, Chunker, MetadataExtractor（13/13 PASS）
+  - ✅ **Phase 2-2**：PDF Parser — PyMuPDF 集成（5/5 PASS）
+  - ✅ **Phase 2-3**：Text Normalizer + Scientific Chunker（13/13 PASS）
+  - ✅ **Phase 2-4**：Metadata Extractor + IngestionPipeline 编排 + 幂等校验（6/6 PASS）
+  - ✅ **Phase 1 + Phase 2 全部完成！全量 87/87 PASS**
+- **遇到问题**: chromadb 1.5.9 拒绝空 dict metadata；pytest-asyncio 1.4.0 需 @pytest_asyncio.fixture；datetime.utcnow() 已弃用
+- **明日计划**: Phase 3 Retrieval + Services（Keyword/Vector/Hybrid Retriever → Chat/Search/Summarize Service）
 
 ### 2026-06-27
 - **今日目标**: Phase 1 Task 3-5（ChatMessage → AI Provider Interfaces → OpenAI LLM Provider）

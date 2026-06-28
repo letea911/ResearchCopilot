@@ -7,8 +7,8 @@
 ## 当前状态
 
 - 📅 最后更新：2026-06-28
-- 🔄 当前阶段：Phase 1 完成 → Phase 2 Ingestion Pipeline
-- ⏳ 下一里程碑：PDF 导入 + 向量检索可用
+- 🔄 当前阶段：Phase 2 完成 → Phase 3 Retrieval + Services
+- ⏳ 下一里程碑：端到端问答可用（`research ask`）
 
 ---
 
@@ -51,17 +51,19 @@
 
 **测试总计：32/32 PASS**
 
-### Phase 2: Ingestion Pipeline
+### Phase 2: Ingestion Pipeline ✅
 
 | 任务 | 状态 | 日期 |
 |---|---|---|
+| Ingestion 数据模型 + 接口 (Parser, Normalizer, Chunker, MetadataExtractor) | ✅ | 2026-06-28 |
 | PDF Parser (PyMuPDF) | ✅ | 2026-06-28 |
 | Text Normalizer | ✅ | 2026-06-28 |
 | Scientific Chunker | ✅ | 2026-06-28 |
-| Rule-Based Metadata Extractor | ✅ | 2026-06-28 |
-| IngestionPipeline 编排 + 幂等 | ✅ | 2026-06-28 |
+| Rule-Based Metadata Extractor + IngestionPipeline 编排 (幂等) | ✅ | 2026-06-28 |
 | `research ingest` CLI 命令 | ⬜ | - |
 | 集成测试 (导入 10 篇 PDF) | ⬜ | - |
+
+**测试总计：87/87 PASS**
 
 ### Phase 3: Retrieval + Services
 
@@ -127,6 +129,6 @@
 
 | 日期 | 关键进展 |
 |---|---|
-| 2026-06-28 | Phase 1 完成！Task 7-11：Storage Models + Interfaces + FileStore + SQLite + ChromaDB (32/32 PASS) |
+| 2026-06-28 | Phase 1 + Phase 2 全部完成！87/87 PASS。Storage + AI Providers + Ingestion Pipeline |
 | 2026-06-27 | Phase 1 Task 3-6：ChatMessage + Provider Interfaces + OpenAI LLM + Embedding Provider |
 | 2026-06-26 | 项目脚手架 + 全栈接口设计 + Spec 定稿 + Git/SSH 配置 + Phase 1 Task 1-2 |
