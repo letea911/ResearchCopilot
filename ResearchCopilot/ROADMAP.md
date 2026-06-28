@@ -55,11 +55,11 @@
 
 | 任务 | 状态 | 日期 |
 |---|---|---|
-| PDF Parser (PyMuPDF) | ⬜ | - |
-| Text Normalizer | ⬜ | - |
-| Scientific Chunker | ⬜ | - |
-| Rule-Based Metadata Extractor | ⬜ | - |
-| IngestionPipeline 编排 + 幂等 | ⬜ | - |
+| PDF Parser (PyMuPDF) | ✅ | 2026-06-28 |
+| Text Normalizer | ✅ | 2026-06-28 |
+| Scientific Chunker | ✅ | 2026-06-28 |
+| Rule-Based Metadata Extractor | ✅ | 2026-06-28 |
+| IngestionPipeline 编排 + 幂等 | ✅ | 2026-06-28 |
 | `research ingest` CLI 命令 | ⬜ | - |
 | 集成测试 (导入 10 篇 PDF) | ⬜ | - |
 
