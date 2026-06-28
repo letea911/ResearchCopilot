@@ -7,8 +7,8 @@
 ## 当前状态
 
 - 📅 最后更新：2026-06-28
-- 🔄 当前阶段：Phase 2 完成 → Phase 3 Retrieval + Services
-- ⏳ 下一里程碑：端到端问答可用（`research ask`）
+- 🔄 当前阶段：Phase 3 完成 → Phase 4 Polish & Sync
+- ⏳ 下一里程碑：MVP 可演示（`research ask` 端到端可用）
 
 ---
 
@@ -65,18 +65,21 @@
 
 **测试总计：87/87 PASS**
 
-### Phase 3: Retrieval + Services
+### Phase 3: Retrieval + Services ✅
 
 | 任务 | 状态 | 日期 |
 |---|---|---|
-| Keyword Retriever (SQLite FTS5) | ⬜ | - |
-| Vector Retriever (ChromaDB) | ⬜ | - |
-| Hybrid Retriever (RRF fusion) | ⬜ | - |
-| ChatService (ask + ask_stream) | ⬜ | - |
-| SearchService (纯检索) | ⬜ | - |
-| SummarizeService (文档摘要) | ⬜ | - |
-| `research ask/search/summarize` CLI | ⬜ | - |
+| Retrieval 数据模型 + 接口 (KeywordRetriever, VectorRetriever, HybridRetriever) | ✅ | 2026-06-28 |
+| Keyword Retriever — SQLite FTS5 | ✅ | 2026-06-28 |
+| Vector Retriever — ChromaDB | ✅ | 2026-06-28 |
+| Hybrid Retriever — RRF fusion | ✅ | 2026-06-28 |
+| ChatService (ask + ask_stream) | ✅ | 2026-06-28 |
+| SearchService (纯检索) | ✅ | 2026-06-28 |
+| SummarizeService (文档摘要) | ✅ | 2026-06-28 |
+| CLI 命令 (ingest, ask, search, summarize, list-docs, status) | ✅ | 2026-06-28 |
 | 集成测试 (端到端问答) | ⬜ | - |
+
+**测试总计：95/95 PASS**
 
 ### Phase 4: Polish & Sync
 
@@ -129,6 +132,6 @@
 
 | 日期 | 关键进展 |
 |---|---|
-| 2026-06-28 | Phase 1 + Phase 2 全部完成！87/87 PASS。Storage + AI Providers + Ingestion Pipeline |
+| 2026-06-28 | Phase 1 + 2 + 3 全部完成！95/95 PASS。Storage + AI + Ingestion + Retrieval + Services + CLI |
 | 2026-06-27 | Phase 1 Task 3-6：ChatMessage + Provider Interfaces + OpenAI LLM + Embedding Provider |
 | 2026-06-26 | 项目脚手架 + 全栈接口设计 + Spec 定稿 + Git/SSH 配置 + Phase 1 Task 1-2 |

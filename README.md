@@ -30,17 +30,18 @@ AI-powered research literature assistant.
 
 ## 📋 每日开发日志 (Daily Dev Log)
 
-### 2026-06-28
-- **今日目标**: Phase 1 Task 7-11 全部完成 + Phase 2 Ingestion Pipeline
+### 2026-06-28 🚀 超高产日
+- **今日目标**: Phase 1 收尾 + Phase 2 + Phase 3 全部完成
 - **完成事项**:
-  - ✅ **Phase 1 收尾**：Storage Models + Interfaces + FileStore + SQLite + ChromaDB（32/32 PASS）
-  - ✅ **Phase 2-1**：Ingestion Models + Interfaces — Parser, Normalizer, Chunker, MetadataExtractor（13/13 PASS）
-  - ✅ **Phase 2-2**：PDF Parser — PyMuPDF 集成（5/5 PASS）
-  - ✅ **Phase 2-3**：Text Normalizer + Scientific Chunker（13/13 PASS）
-  - ✅ **Phase 2-4**：Metadata Extractor + IngestionPipeline 编排 + 幂等校验（6/6 PASS）
-  - ✅ **Phase 1 + Phase 2 全部完成！全量 87/87 PASS**
-- **遇到问题**: chromadb 1.5.9 拒绝空 dict metadata；pytest-asyncio 1.4.0 需 @pytest_asyncio.fixture；datetime.utcnow() 已弃用
-- **明日计划**: Phase 3 Retrieval + Services（Keyword/Vector/Hybrid Retriever → Chat/Search/Summarize Service）
+  - ✅ **Phase 1 收尾**：Storage + FileStore + SQLite + ChromaDB（32/32 PASS）
+  - ✅ **Phase 2**：Ingestion Pipeline — Parser + Normalizer + Chunker + Metadata + Pipeline 编排（87/87 PASS）
+  - ✅ **Phase 3-1**：Retrieval Models + Interfaces（8/8 PASS）
+  - ✅ **Phase 3-2**：Keyword + Vector + Hybrid Retriever（20/20 PASS）
+  - ✅ **Phase 3-3**：ChatService + SearchService + SummarizeService（4/4 PASS）
+  - ✅ **Phase 3-4**：CLI — ingest / ask / search / summarize / list-docs / status（7/7 PASS）
+  - ✅ **Phase 1+2+3 全部完成！全量 95/95 PASS 🎉**
+- **遇到问题**: chromadb 1.5.9 空 metadata 拒绝；FTS5 需手动 rebuild 索引；`list` 与 Python 内置冲突改名 `list-docs`
+- **明日计划**: Phase 4 Polish — 真实 PDF 端到端测试 + 错误处理完善 + `research ask` 首次真实调用
 
 ### 2026-06-27
 - **今日目标**: Phase 1 Task 3-5（ChatMessage → AI Provider Interfaces → OpenAI LLM Provider）
