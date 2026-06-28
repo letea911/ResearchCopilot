@@ -1,0 +1,185 @@
+import aiosqlite
+from config.model import StorageConfig
+from storage.interfaces import BaseMetadataStore
+from storage.models import DocumentRecord, ChunkRecord
+
+
+class SQLiteMetadataStore(BaseMetadataStore):
+    """SQLite-backed metadata store with FTS5 for future keyword search."""
+
+    def __init__(self, config: StorageConfig):
+        self._db_path = config.sqlite_path
+        self._conn: aiosqlite.Connection | None = None
+
+    async def initialize(self):
+        self._conn = await aiosqlite.connect(self._db_path)
+        self._conn.row_factory = aiosqlite.Row
+        await self._create_tables()
+
+    async def close(self):
+        if self._conn:
+            await self._conn.close()
+
+    async def _create_tables(self):
+        await self._conn.executescript("""
+            CREATE TABLE IF NOT EXISTS documents (
+                id TEXT PRIMARY KEY,
+                document_type TEXT NOT NULL,
+                title TEXT NOT NULL,
+                authors TEXT,
+                year INTEGER,
+                journal TEXT,
+                doi TEXT UNIQUE,
+                keywords TEXT,
+                abstract TEXT,
+                source_type TEXT DEFAULT 'pdf',
+                file_path TEXT,
+                extra TEXT,
+                created_at TEXT DEFAULT ''
+            );
+
+            CREATE TABLE IF NOT EXISTS chunks (
+                id TEXT PRIMARY KEY,
+                document_id TEXT NOT NULL,
+                chunk_index INTEGER NOT NULL,
+                content TEXT NOT NULL,
+                chroma_id TEXT NOT NULL,
+                token_count INTEGER DEFAULT 0,
+                page_number INTEGER,
+                start_offset INTEGER,
+                end_offset INTEGER,
+                FOREIGN KEY (document_id) REFERENCES documents(id)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_chunks_document_id ON chunks(document_id);
+            CREATE INDEX IF NOT EXISTS idx_chunks_chroma_id ON chunks(chroma_id);
+            CREATE INDEX IF NOT EXISTS idx_documents_type ON documents(document_type);
+            CREATE INDEX IF NOT EXISTS idx_documents_year ON documents(year);
+
+            CREATE VIRTUAL TABLE IF NOT EXISTS documents_fts USING fts5(
+                title, authors, keywords, abstract, content='documents', content_rowid='rowid'
+            );
+        """)
+        await self._conn.commit()
+
+    async def insert_document(self, doc: DocumentRecord) -> None:
+        import json
+        await self._conn.execute(
+            """INSERT INTO documents (id, document_type, title, authors, year,
+               journal, doi, keywords, abstract, source_type, file_path,
+               extra, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                doc.id, doc.document_type, doc.title, doc.authors,
+                doc.year, doc.journal, doc.doi, doc.keywords,
+                doc.abstract, doc.source_type, doc.file_path,
+                json.dumps(doc.extra) if doc.extra else None,
+                doc.created_at,
+            ),
+        )
+        await self._conn.commit()
+
+    async def get_document(self, document_id: str) -> DocumentRecord | None:
+        import json
+        cursor = await self._conn.execute(
+            "SELECT * FROM documents WHERE id = ?", (document_id,)
+        )
+        row = await cursor.fetchone()
+        if row is None:
+            return None
+        return self._row_to_document(row)
+
+    async def get_document_by_doi(self, doi: str) -> DocumentRecord | None:
+        cursor = await self._conn.execute(
+            "SELECT * FROM documents WHERE doi = ?", (doi,)
+        )
+        row = await cursor.fetchone()
+        if row is None:
+            return None
+        return self._row_to_document(row)
+
+    async def list_documents(
+        self,
+        document_type: str | None = None,
+        year: int | None = None,
+        limit: int = 50,
+    ) -> list[DocumentRecord]:
+        query = "SELECT * FROM documents WHERE 1=1"
+        params = []
+        if document_type is not None:
+            query += " AND document_type = ?"
+            params.append(document_type)
+        if year is not None:
+            query += " AND year = ?"
+            params.append(year)
+        query += " ORDER BY created_at DESC LIMIT ?"
+        params.append(limit)
+
+        cursor = await self._conn.execute(query, params)
+        rows = await cursor.fetchall()
+        return [self._row_to_document(r) for r in rows]
+
+    async def insert_chunks(self, chunks: list[ChunkRecord]) -> None:
+        await self._conn.executemany(
+            """INSERT INTO chunks (id, document_id, chunk_index, content,
+               chroma_id, token_count, page_number, start_offset, end_offset)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            [
+                (
+                    c.id, c.document_id, c.chunk_index, c.content,
+                    c.chroma_id, c.token_count, c.page_number,
+                    c.start_offset, c.end_offset,
+                )
+                for c in chunks
+            ],
+        )
+        await self._conn.commit()
+
+    async def get_chunks_by_document(self, document_id: str) -> list[ChunkRecord]:
+        cursor = await self._conn.execute(
+            "SELECT * FROM chunks WHERE document_id = ? ORDER BY chunk_index",
+            (document_id,),
+        )
+        rows = await cursor.fetchall()
+        return [self._row_to_chunk(r) for r in rows]
+
+    async def get_chunk_by_chroma_id(self, chroma_id: str) -> ChunkRecord | None:
+        cursor = await self._conn.execute(
+            "SELECT * FROM chunks WHERE chroma_id = ?", (chroma_id,)
+        )
+        row = await cursor.fetchone()
+        if row is None:
+            return None
+        return self._row_to_chunk(row)
+
+    def _row_to_document(self, row) -> DocumentRecord:
+        import json
+        extra = row["extra"]
+        return DocumentRecord(
+            id=row["id"],
+            document_type=row["document_type"],
+            title=row["title"],
+            authors=row["authors"],
+            year=row["year"],
+            journal=row["journal"],
+            doi=row["doi"],
+            keywords=row["keywords"],
+            abstract=row["abstract"],
+            source_type=row["source_type"],
+            file_path=row["file_path"],
+            extra=json.loads(extra) if extra else None,
+            created_at=row["created_at"],
+        )
+
+    def _row_to_chunk(self, row) -> ChunkRecord:
+        return ChunkRecord(
+            id=row["id"],
+            document_id=row["document_id"],
+            chunk_index=row["chunk_index"],
+            content=row["content"],
+            chroma_id=row["chroma_id"],
+            token_count=row["token_count"],
+            page_number=row["page_number"],
+            start_offset=row["start_offset"],
+            end_offset=row["end_offset"],
+        )
