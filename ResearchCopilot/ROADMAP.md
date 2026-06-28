@@ -6,9 +6,9 @@
 
 ## 当前状态
 
-- 📅 最后更新：2026-06-27
-- 🔄 当前阶段：Phase 1 — MVP Core (Storage + AI Providers)
-- ⏳ 下一里程碑：完成 Storage 层实现
+- 📅 最后更新：2026-06-28
+- 🔄 当前阶段：Phase 1 完成 → Phase 2 Ingestion Pipeline
+- ⏳ 下一里程碑：PDF 导入 + 向量检索可用
 
 ---
 
@@ -33,7 +33,7 @@
 
 **产出物**：[docs/superpowers/specs/2026-06-26-research-copilot-mvp-design.md](docs/superpowers/specs/2026-06-26-research-copilot-mvp-design.md)
 
-### Phase 1: MVP Core — Storage + AI Providers ⬅ 进行中
+### Phase 1: MVP Core — Storage + AI Providers ✅
 
 | 任务 | 状态 | 日期 |
 |---|---|---|
@@ -43,9 +43,13 @@
 | AI Provider 接口 (BaseLLMProvider + BaseEmbeddingProvider) | ✅ | 2026-06-27 |
 | OpenAI LLM Provider 实现 | ✅ | 2026-06-27 |
 | OpenAI Embedding Provider 实现 | ✅ | 2026-06-27 |
-| BaseFileStore 实现 (本地文件系统) | ⬜ | - |
-| BaseMetadataStore 实现 (SQLite + FTS5) | ⬜ | - |
-| BaseVectorStore 实现 (ChromaDB) | ⬜ | - |
+| Storage 数据模型 (DocumentRecord, ChunkRecord, VectorDocument, RetrievalResult) | ✅ | 2026-06-28 |
+| Storage 接口 (BaseFileStore, BaseMetadataStore, BaseVectorStore) | ✅ | 2026-06-28 |
+| LocalFileStore 实现 | ✅ | 2026-06-28 |
+| SQLiteMetadataStore 实现 (SQLite + FTS5) | ✅ | 2026-06-28 |
+| ChromaVectorStore 实现 (ChromaDB) | ✅ | 2026-06-28 |
+
+**测试总计：32/32 PASS**
 
 ### Phase 2: Ingestion Pipeline
 
@@ -123,5 +127,6 @@
 
 | 日期 | 关键进展 |
 |---|---|
-| 2026-06-27 | Phase 1 Task 3-5 完成：ChatMessage + Provider Interfaces + OpenAI LLM Provider |
+| 2026-06-28 | Phase 1 完成！Task 7-11：Storage Models + Interfaces + FileStore + SQLite + ChromaDB (32/32 PASS) |
+| 2026-06-27 | Phase 1 Task 3-6：ChatMessage + Provider Interfaces + OpenAI LLM + Embedding Provider |
 | 2026-06-26 | 项目脚手架 + 全栈接口设计 + Spec 定稿 + Git/SSH 配置 + Phase 1 Task 1-2 |

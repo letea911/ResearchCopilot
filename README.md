@@ -30,6 +30,18 @@ AI-powered research literature assistant.
 
 ## 📋 每日开发日志 (Daily Dev Log)
 
+### 2026-06-28
+- **今日目标**: Phase 1 Task 7-11 全部完成，结束 Phase 1
+- **完成事项**:
+  - ✅ Task 7：Storage 数据模型 — DocumentRecord, ChunkRecord, VectorDocument, RetrievalResult（5/5 PASS）
+  - ✅ Task 8：Storage 接口 — BaseFileStore, BaseMetadataStore, BaseVectorStore（5/5 PASS）
+  - ✅ Task 9：LocalFileStore 实现（7/7 PASS）
+  - ✅ Task 10：SQLiteMetadataStore 实现 — SQLite + FTS5（9/9 PASS）
+  - ✅ Task 11：ChromaVectorStore 实现（6/6 PASS）
+  - ✅ **Phase 1 全部完成！全量 32/32 PASS**
+- **遇到问题**: chromadb 1.5.9 拒绝空 dict metadata，需转为 None；pytest-asyncio 1.4.0 需显式 @pytest_asyncio.fixture
+- **明日计划**: Phase 2 Ingestion Pipeline（Parser → Normalizer → Chunker → Metadata Extractor）
+
 ### 2026-06-27
 - **今日目标**: Phase 1 Task 3-5（ChatMessage → AI Provider Interfaces → OpenAI LLM Provider）
 - **完成事项**:
