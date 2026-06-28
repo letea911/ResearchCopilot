@@ -59,6 +59,9 @@ class SQLiteMetadataStore(BaseMetadataStore):
             CREATE VIRTUAL TABLE IF NOT EXISTS documents_fts USING fts5(
                 title, authors, keywords, abstract, content='documents', content_rowid='rowid'
             );
+
+            -- Rebuild FTS index to ensure sync (compensates for missing auto-triggers)
+            INSERT INTO documents_fts(documents_fts) VALUES('rebuild');
         """)
         await self._conn.commit()
 
@@ -76,6 +79,10 @@ class SQLiteMetadataStore(BaseMetadataStore):
                 json.dumps(doc.extra) if doc.extra else None,
                 doc.created_at,
             ),
+        )
+        # Rebuild FTS index to compensate for missing content-sync triggers
+        await self._conn.execute(
+            "INSERT INTO documents_fts(documents_fts) VALUES('rebuild')"
         )
         await self._conn.commit()
 
