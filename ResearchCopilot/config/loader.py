@@ -8,7 +8,7 @@ def load_config():
 
     llm = LLMConfig(
         provider=os.getenv("LLM_PROVIDER", "deepseek"),
-        model=os.getenv("LLM_MODEL", "deepseek-v4-pro"),
+        model=os.getenv("LLM_MODEL", "deepseek-chat"),
         base_url=os.getenv("LLM_BASE_URL") or None,
         temperature=float(os.getenv("LLM_TEMPERATURE", "0.1")),
         max_tokens=int(os.getenv("LLM_MAX_TOKENS", "4096")),

@@ -14,7 +14,7 @@ class DeepSeekProvider(BaseLLMProvider):
     Reads API key from LLM_API_KEY environment variable.
     """
 
-    DEFAULT_BASE_URL = "https://api.deepseek.com"
+    DEFAULT_BASE_URL = "https://api.deepseek.com/v1"
 
     def __init__(self, config: LLMConfig):
         self._config = config
