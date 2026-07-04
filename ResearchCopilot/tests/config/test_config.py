@@ -15,7 +15,7 @@ async def test_load_config_defaults():
 
     assert chunk.chunk_size == 1024
     assert chunk.chunk_overlap == 128
-    assert embedding.dimension == 1536
+    assert embedding.dimension == 384
 
 
 @pytest.mark.asyncio
