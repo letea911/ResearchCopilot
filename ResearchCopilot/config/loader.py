@@ -7,18 +7,18 @@ def load_config():
     load_dotenv()
 
     llm = LLMConfig(
-        provider=os.getenv("LLM_PROVIDER", "openai"),
-        model=os.getenv("LLM_MODEL", "gpt-4o"),
+        provider=os.getenv("LLM_PROVIDER", "deepseek"),
+        model=os.getenv("LLM_MODEL", "deepseek-v4-pro"),
         base_url=os.getenv("LLM_BASE_URL") or None,
         temperature=float(os.getenv("LLM_TEMPERATURE", "0.1")),
         max_tokens=int(os.getenv("LLM_MAX_TOKENS", "4096")),
     )
 
     embedding = EmbeddingConfig(
-        provider=os.getenv("EMBEDDING_PROVIDER", "openai"),
-        model=os.getenv("EMBEDDING_MODEL", "text-embedding-3-small"),
+        provider=os.getenv("EMBEDDING_PROVIDER", "local"),
+        model=os.getenv("EMBEDDING_MODEL", "BAAI/bge-small-en-v1.5"),
         base_url=os.getenv("EMBEDDING_BASE_URL") or None,
-        dimension=int(os.getenv("EMBEDDING_DIMENSION", "1536")),
+        dimension=int(os.getenv("EMBEDDING_DIMENSION", "384")),
     )
 
     chunk = ChunkConfig(

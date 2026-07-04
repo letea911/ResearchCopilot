@@ -475,8 +475,8 @@ ResearchCopilot/
 
 | Layer | Interface | MVP Default |
 |---|---|---|
-| LLM | `BaseLLMProvider` | `OpenAILLMProvider` (compatible with DeepSeek via base_url) |
-| Embedding | `BaseEmbeddingProvider` | `OpenAIEmbeddingProvider` (`text-embedding-3-small`) |
+| LLM | `BaseLLMProvider` | `DeepSeekProvider` (DeepSeek V4 Pro, OpenAI-compatible API) |
+| Embedding | `BaseEmbeddingProvider` | `LocalEmbeddingProvider` (`BAAI/bge-small-en-v1.5`, 384d, free) |
 | File Store | `BaseFileStore` | `LocalFileStore` (filesystem) |
 | Metadata Store | `BaseMetadataStore` | `SQLiteMetadataStore` (with FTS5) |
 | Vector Store | `BaseVectorStore` | `ChromaVectorStore` |

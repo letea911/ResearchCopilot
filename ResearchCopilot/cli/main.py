@@ -14,8 +14,8 @@ console = Console()
 def _build_context():
     """Build the application context — all wired dependencies."""
     from config.loader import load_config
-    from providers.llm.openai import OpenAILLMProvider
-    from providers.embedding.openai import OpenAIEmbeddingProvider
+    from providers.llm.deepseek import DeepSeekProvider
+    from providers.embedding.local import LocalEmbeddingProvider
     from storage.file_store import LocalFileStore
     from storage.sqlite_meta import SQLiteMetadataStore
     from storage.chroma_vector import ChromaVectorStore
@@ -33,8 +33,8 @@ def _build_context():
 
     llm_cfg, emb_cfg, chunk_cfg, storage_cfg = load_config()
 
-    llm = OpenAILLMProvider(llm_cfg)
-    embedder = OpenAIEmbeddingProvider(emb_cfg)
+    llm = DeepSeekProvider(llm_cfg)
+    embedder = LocalEmbeddingProvider(emb_cfg)
 
     file_store = LocalFileStore(storage_cfg)
     meta_store = SQLiteMetadataStore(storage_cfg)

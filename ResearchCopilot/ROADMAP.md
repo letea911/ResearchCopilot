@@ -106,8 +106,8 @@
 
 | 层 | 技术 | 备注 |
 |---|---|---|
-| LLM | DeepSeek V4 Pro (via OpenAI-compatible API) | .env 配置，可换 |
-| Embedding | OpenAI text-embedding-3-small (1536d) | 后续支持 BGE |
+| LLM | DeepSeek V4 Pro | .env 配置，可换 |
+| Embedding | BGE-small-en-v1.5 (384d, 本地免费) | 可选 OpenAI / BGE-large |
 | 向量库 | ChromaDB | 本地持久化 |
 | 元数据 | SQLite + FTS5 | 全文搜索 |
 | PDF 解析 | PyMuPDF | 支持双栏/图表 |
