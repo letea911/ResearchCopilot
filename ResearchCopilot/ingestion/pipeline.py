@@ -51,10 +51,13 @@ class IngestionPipeline:
         """Ingest a single file. Returns document_id. Idempotent via file hash."""
         file_hash = self._compute_hash(source)
 
-        # Idempotency check: does this file already exist?
-        existing = await self._meta_store.get_document_by_doi(f"hash:{file_hash}")
-        if existing:
-            return existing.id
+        # Idempotency check: skip if source file already matches a stored file_path
+        docs = await self._meta_store.list_documents(limit=10000)
+        source_name = source.name
+        for d in docs:
+            if d.file_path and source_name in d.file_path:
+                print(f'  SKIP: {source_name} (already imported as {d.id[:8]})')
+                return d.id
 
         # 1. Parse
         parser = self._get_parser(source)
@@ -71,8 +74,10 @@ class IngestionPipeline:
 
         # 4. Extract metadata
         doc_record = await self._metadata_extractor.extract(chunked)
-        # Store file hash in DOI field for dedup (or could use extra field)
-        doc_record.doi = f"hash:{file_hash}" if not doc_record.doi else doc_record.doi
+        # Store file hash in extra for dedup, preserve real DOI
+        if doc_record.extra is None:
+            doc_record.extra = {}
+        doc_record.extra["file_hash"] = file_hash
 
         # 5. File Store
         file_path = self._file_store.save(source, category="papers")
