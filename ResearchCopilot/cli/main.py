@@ -66,6 +66,16 @@ def _build_context():
     }
 
 
+_app_ctx = None
+
+def _get_context():
+    """Lazy-init the application context — build once, reuse."""
+    global _app_ctx
+    if _app_ctx is None:
+        _app_ctx = _build_context()
+    return _app_ctx
+
+
 def _init_stores(ctx):
     """Initialize stores (create tables, connect)."""
     async def _init():
@@ -79,21 +89,21 @@ def _init_stores(ctx):
 def cli(ctx):
     """ResearchCopilot — AI-powered research literature assistant."""
     ctx.ensure_object(dict)
-    console.print(Panel.fit(
-        "[bold blue]ResearchCopilot[/bold blue] — AI Research Assistant",
-        subtitle="Computational Chemistry / Materials Science / Catalysis"
-    ))
+    # Only build context once (lazy init on first command)
+    # We defer _build_context to the actual commands to avoid
+    # loading models/connecting to DB at CLI startup
+    pass
 
 
 @cli.command()
 @click.argument("path", type=click.Path(exists=True))
-@click.pass_context
-def ingest(ctx, path):
+def ingest(path):
     """Ingest a PDF paper into the knowledge base."""
-    _init_stores(ctx.obj)
+    ctx = _get_context()
+    _init_stores(ctx)
 
     async def _run():
-        doc_id = await ctx.obj["pipeline"].ingest(Path(path))
+        doc_id = await ctx["pipeline"].ingest(Path(path))
         console.print(f"[green]✓[/green] Ingested: [bold]{path}[/bold]")
         console.print(f"  Document ID: [dim]{doc_id}[/dim]")
 
@@ -104,11 +114,11 @@ def ingest(ctx, path):
 @click.argument("question")
 @click.option("--top-k", default=10, help="Number of chunks to retrieve")
 @click.option("--stream/--no-stream", default=True, help="Stream the response")
-@click.pass_context
-def ask(ctx, question, top_k, stream):
+def ask(question, top_k, stream):
     """Ask a research question."""
-    _init_stores(ctx.obj)
-    chat = ctx.obj["chat"]
+    ctx = _get_context()
+    _init_stores(ctx)
+    chat = ctx["chat"]
 
     async def _run():
         if stream:
@@ -131,11 +141,11 @@ def ask(ctx, question, top_k, stream):
 @click.argument("query")
 @click.option("--top-k", default=20, help="Number of results")
 @click.option("--type", "doc_type", default=None, help="Filter by document type")
-@click.pass_context
-def search(ctx, query, top_k, doc_type):
+def search_cmd(query, top_k, doc_type):
     """Search the knowledge base without LLM."""
-    _init_stores(ctx.obj)
-    svc = ctx.obj["search"]
+    ctx = _get_context()
+    _init_stores(ctx)
+    svc = ctx["search"]
 
     async def _run():
         result = await svc.search(query, top_k=top_k, document_type=doc_type)
@@ -163,11 +173,11 @@ def search(ctx, query, top_k, doc_type):
 @cli.command()
 @click.argument("document_id")
 @click.option("--focus", default=None, help="Focus: methods, results, conclusion")
-@click.pass_context
-def summarize(ctx, document_id, focus):
+def summarize(document_id, focus):
     """Summarize a document by ID."""
-    _init_stores(ctx.obj)
-    svc = ctx.obj["summarize"]
+    ctx = _get_context()
+    _init_stores(ctx)
+    svc = ctx["summarize"]
 
     async def _run():
         result = await svc.summarize(document_id, focus=focus)
@@ -182,11 +192,11 @@ def summarize(ctx, document_id, focus):
 @cli.command()
 @click.option("--doc-type", default=None, help="Filter by document type")
 @click.option("--limit", default=20, help="Number of documents to list")
-@click.pass_context
-def list_docs(ctx, doc_type, limit):
+def list_docs(doc_type, limit):
     """List documents in the knowledge base."""
-    _init_stores(ctx.obj)
-    meta = ctx.obj["meta_store"]
+    ctx = _get_context()
+    _init_stores(ctx)
+    meta = ctx["meta_store"]
 
     async def _run():
         docs = await meta.list_documents(document_type=doc_type, limit=limit)
@@ -215,13 +225,13 @@ def list_docs(ctx, doc_type, limit):
 
 
 @cli.command()
-@click.pass_context
-def status(ctx):
+def status():
     """Show knowledge base status."""
-    _init_stores(ctx.obj)
-    meta = ctx.obj["meta_store"]
-    vec = ctx.obj["vector_store"]
-    file_store = ctx.obj["file_store"]
+    ctx = _get_context()
+    _init_stores(ctx)
+    meta = ctx["meta_store"]
+    vec = ctx["vector_store"]
+    file_store = ctx["file_store"]
 
     async def _run():
         docs = await meta.list_documents(limit=1000)
