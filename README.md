@@ -30,6 +30,18 @@ AI-powered research literature assistant.
 
 ## 📋 每日开发日志 (Daily Dev Log)
 
+### 2026-07-07
+- **今日目标**: Phase 4 — DeepSeek 替换 + 端到端验证 MVP
+- **完成事项**:
+  - ✅ 本地 Embedding Provider（BGE-small-en-v1.5, 384d, 免费免 API）
+  - ✅ .env 配置 + DeepSeek API 连通性验证（模型 deepseek-chat, base_url /v1）
+  - ✅ OpenAI → DeepSeek 全项目替换（provider、config、CLI、ROADMAP、spec）
+  - ✅ FTS5 关键词检索修复（自然语言转义 + LIKE 回退）
+  - ✅ CLI 上下文初始化修复（_get_context 懒加载）
+  - ✅ **端到端验证通过**：`research ingest` → `research search` → `research ask` 全链路
+- **遇到问题**: DeepSeek 模型名需用 `deepseek-chat` 非 `v4-pro`；OpenAI SDK 需 `/v1` 路径；FTS5 不接收自然语言；CLI Context 未注入
+- **明日计划**: 导入真实论文开始使用，批量导入优化
+
 ### 2026-06-28 🚀 超高产日
 - **今日目标**: Phase 1 收尾 + Phase 2 + Phase 3 全部完成
 - **完成事项**:

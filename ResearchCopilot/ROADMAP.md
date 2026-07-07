@@ -6,9 +6,9 @@
 
 ## 当前状态
 
-- 📅 最后更新：2026-06-28
-- 🔄 当前阶段：Phase 3 完成 → Phase 4 Polish & Sync
-- ⏳ 下一里程碑：MVP 可演示（`research ask` 端到端可用）
+- 📅 最后更新：2026-07-07
+- 🔄 当前阶段：Phase 4 完成 → MVP 可用 🎉
+- ⏳ 下一里程碑：导入真实论文，开始科研使用
 
 ---
 
@@ -81,15 +81,20 @@
 
 **测试总计：95/95 PASS**
 
-### Phase 4: Polish & Sync
+### Phase 4: Polish & Sync ✅
 
 | 任务 | 状态 | 日期 |
 |---|---|---|
-| CLI 美化 (rich 格式输出) | ⬜ | - |
-| 错误处理完善 | ⬜ | - |
-| 性能优化 (批量导入 100+ PDF) | ⬜ | - |
-| Git push + GitHub sync | ⬜ | - |
-| README 更新 | ⬜ | - |
+| 本地 Embedding Provider (BGE-small, 免费免 API) | ✅ | 2026-07-07 |
+| .env 配置 + DeepSeek API 调通 | ✅ | 2026-07-07 |
+| OpenAI → DeepSeek 全项目替换 | ✅ | 2026-07-07 |
+| FTS5 查询转义修复 + LIKE 回退 | ✅ | 2026-07-07 |
+| CLI 懒加载初始化修复 | ✅ | 2026-07-07 |
+| 端到端验证（ingest → search → ask 全链路） | ✅ | 2026-07-07 |
+| Git push + GitHub sync | ✅ | 2026-07-07 |
+
+**测试总计：全量 PASS ✅**
+**MVP 状态：可用 🎉**
 
 ### Future: 后续版本
 
@@ -132,6 +137,7 @@
 
 | 日期 | 关键进展 |
 |---|---|
+| 2026-07-07 | Phase 4 完成！DeepSeek API 调通 + 本地 BGE Embedding + 端到端 `research ask` 可运行 |
 | 2026-06-28 | Phase 1 + 2 + 3 全部完成！95/95 PASS。Storage + AI + Ingestion + Retrieval + Services + CLI |
 | 2026-06-27 | Phase 1 Task 3-6：ChatMessage + Provider Interfaces + OpenAI LLM + Embedding Provider |
 | 2026-06-26 | 项目脚手架 + 全栈接口设计 + Spec 定稿 + Git/SSH 配置 + Phase 1 Task 1-2 |
