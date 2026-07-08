@@ -20,9 +20,10 @@ Paper chunks:
 
 
 class SummarizeService(BaseSummarizeService):
-    def __init__(self, llm: BaseLLMProvider, meta_store: BaseMetadataStore):
+    def __init__(self, llm: BaseLLMProvider, meta_store: BaseMetadataStore, file_store=None):
         self._llm = llm
         self._meta_store = meta_store
+        self._file_store = file_store
 
     async def summarize(self, document_id: str,
                         focus: str | None = None) -> ServiceResponse:
@@ -40,11 +41,19 @@ class SummarizeService(BaseSummarizeService):
 
         answer = await self._llm.chat(messages)
 
+        # Resolve file path for clickable PDF link
+        file_path = None
+        if doc and doc.file_path and self._file_store:
+            abs_path = self._file_store.get_path(doc.file_path)
+            file_path = str(abs_path)
+
         citation = Citation(
             document_id=document_id,
             title=doc.title if doc else "Unknown",
             authors=doc.authors if doc else "",
             year=doc.year if doc else None,
+            journal=doc.journal if doc else None,
+            file_path=file_path,
         )
 
         return ServiceResponse(answer=answer, citations=[citation])

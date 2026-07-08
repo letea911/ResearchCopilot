@@ -55,9 +55,9 @@ def _build_context():
         vector_store=vector_store,
     )
 
-    chat = ChatService(llm, embedder, hybrid_retriever)
+    chat = ChatService(llm, embedder, hybrid_retriever, meta_store, file_store)
     search = SearchService(embedder, hybrid_retriever)
-    summarize = SummarizeService(llm, meta_store)
+    summarize = SummarizeService(llm, meta_store, file_store)
 
     return {
         "llm": llm, "embedder": embedder,
@@ -130,9 +130,24 @@ def ask(question, top_k, stream):
             result = await chat.ask(question, top_k=top_k)
             console.print(Markdown(result.answer))
             if result.citations:
-                console.print("\n[bold]Citations:[/bold]")
+                console.print("\n[bold]📚 References:[/bold]")
                 for i, c in enumerate(result.citations):
-                    console.print(f"  [{i+1}] {c.title} ({c.authors}, {c.year})")
+                    # Build citation line with full metadata
+                    parts = [f"[bold][{i+1}][/bold] {c.title}"]
+                    if c.authors:
+                        parts.append(f"[dim]{c.authors}[/dim]")
+                    if c.journal:
+                        parts.append(f"[italic]{c.journal}[/italic]")
+                    if c.year:
+                        parts.append(str(c.year))
+                    if c.page_number:
+                        parts.append(f"p.{c.page_number}")
+                    line = ", ".join(parts)
+                    console.print(f"  {line}")
+                    # Clickable PDF link
+                    if c.file_path:
+                        file_url = f"file:///{c.file_path.replace(chr(92), '/')}"
+                        console.print(f"    [link={file_url}]📄 Open PDF[/link]")
 
     asyncio.run(_run())
 
@@ -184,7 +199,18 @@ def summarize(document_id, focus):
         console.print(Markdown(result.answer))
         if result.citations:
             c = result.citations[0]
-            console.print(f"\n[dim]Source: {c.title} ({c.authors}, {c.year})[/dim]")
+            parts = [f"[dim]Source:[/dim] {c.title}"]
+            if c.authors:
+                parts.append(f"[dim]{c.authors}[/dim]")
+            if c.journal:
+                parts.append(f"[italic]{c.journal}[/italic]")
+            if c.year:
+                parts.append(str(c.year))
+            line = ", ".join(parts)
+            console.print(f"\n{line}")
+            if c.file_path:
+                file_url = f"file:///{c.file_path.replace(chr(92), '/')}"
+                console.print(f"  [link={file_url}]📄 Open PDF[/link]")
 
     asyncio.run(_run())
 

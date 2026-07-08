@@ -23,10 +23,14 @@ class ChatService(BaseChatService):
         llm: BaseLLMProvider,
         embedder: BaseEmbeddingProvider,
         retriever: BaseHybridRetriever,
+        meta_store=None,
+        file_store=None,
     ):
         self._llm = llm
         self._embedder = embedder
         self._retriever = retriever
+        self._meta_store = meta_store
+        self._file_store = file_store
 
     async def ask(
         self, question: str,
@@ -63,15 +67,31 @@ class ChatService(BaseChatService):
         # 4. LLM inference
         answer = await self._llm.chat(messages)
 
-        # 5. Build citations from retrieved sources
+        # 5. Resolve file paths for citations from meta_store
+        file_paths: dict[str, str | None] = {}
+        if self._meta_store and self._file_store:
+            for chunk in retrieved:
+                doc_id = chunk.document_id
+                if doc_id not in file_paths:
+                    doc = await self._meta_store.get_document(doc_id)
+                    if doc and doc.file_path:
+                        abs_path = self._file_store.get_path(doc.file_path)
+                        file_paths[doc_id] = str(abs_path)
+                    else:
+                        file_paths[doc_id] = None
+
+        # 6. Build citations from retrieved sources
         citations = [
             Citation(
                 document_id=chunk.document_id,
                 title=chunk.metadata.get("title", "Unknown"),
                 authors=chunk.metadata.get("authors", ""),
                 year=chunk.metadata.get("year"),
+                journal=chunk.metadata.get("journal"),
                 chunk_id=chunk.chunk_id,
                 snippet=chunk.content[:200],
+                page_number=chunk.metadata.get("page_number"),
+                file_path=file_paths.get(chunk.document_id),
             )
             for chunk in retrieved
         ]
