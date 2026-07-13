@@ -103,3 +103,30 @@ def test_status_command_help(runner):
         }):
             result = runner.invoke(cli, ["status", "--help"])
             assert result.exit_code == 0
+
+
+def test_chat_command_help(runner):
+    """chat command should exist and show multi-turn help."""
+    from cli.main import cli
+    result = runner.invoke(cli, ["chat", "--help"])
+    assert result.exit_code == 0
+    assert "multi-turn" in result.output.lower() or "conversation" in result.output.lower()
+
+
+def test_chat_exits_on_empty_input(runner):
+    """chat should exit cleanly when the first input is empty."""
+    from cli.main import cli
+    with patch("cli.main._init_stores", lambda x: None):
+        with patch("cli.main._build_context", return_value={
+            "meta_store": AsyncMock(),
+            "vector_store": AsyncMock(),
+            "file_store": MagicMock(),
+            "pipeline": AsyncMock(),
+            "chat": AsyncMock(),
+            "search": AsyncMock(),
+            "summarize": AsyncMock(),
+        }):
+            # Empty line → immediate exit
+            result = runner.invoke(cli, ["chat"], input="\n")
+            assert result.exit_code == 0
+            assert "Bye" in result.output

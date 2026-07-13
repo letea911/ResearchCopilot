@@ -11,6 +11,29 @@ from rich.markdown import Markdown
 console = Console()
 
 
+def _render_citations(citations):
+    """Render a citation list with metadata + clickable PDF links."""
+    if not citations:
+        return
+    console.print("\n[bold]📚 References:[/bold]")
+    for i, c in enumerate(citations):
+        parts = [f"[bold][{i+1}][/bold] {c.title}"]
+        if c.authors:
+            parts.append(f"[dim]{c.authors}[/dim]")
+        if c.journal:
+            parts.append(f"[italic]{c.journal}[/italic]")
+        if c.year:
+            parts.append(str(c.year))
+        if c.section:
+            parts.append(c.section)
+        if c.page_number:
+            parts.append(f"p.{c.page_number}")
+        console.print(f"  {', '.join(parts)}")
+        if c.file_path:
+            file_url = f"file:///{c.file_path.replace(chr(92), '/')}"
+            console.print(f"    [link={file_url}]📄 Open PDF[/link]")
+
+
 def _build_context():
     """Build the application context — all wired dependencies."""
     from config.loader import load_config
@@ -174,29 +197,64 @@ def ask(question, top_k, stream):
         else:
             result = await chat.ask(question, top_k=top_k)
             console.print(Markdown(result.answer))
-            if result.citations:
-                console.print("\n[bold]📚 References:[/bold]")
-                for i, c in enumerate(result.citations):
-                    # Build citation line with full metadata
-                    parts = [f"[bold][{i+1}][/bold] {c.title}"]
-                    if c.authors:
-                        parts.append(f"[dim]{c.authors}[/dim]")
-                    if c.journal:
-                        parts.append(f"[italic]{c.journal}[/italic]")
-                    if c.year:
-                        parts.append(str(c.year))
-                    if c.section:
-                        parts.append(c.section)
-                    if c.page_number:
-                        parts.append(f"p.{c.page_number}")
-                    line = ", ".join(parts)
-                    console.print(f"  {line}")
-                    # Clickable PDF link
-                    if c.file_path:
-                        file_url = f"file:///{c.file_path.replace(chr(92), '/')}"
-                        console.print(f"    [link={file_url}]📄 Open PDF[/link]")
+            _render_citations(result.citations)
 
     asyncio.run(_run())
+
+
+@cli.command()
+@click.option("--top-k", default=10, help="Number of chunks to retrieve per turn")
+def chat(top_k):
+    """Interactive multi-turn chat with conversation memory.
+
+    Type your question and press Enter. Follow-up questions keep context.
+    Type 'exit', 'quit', or an empty line to leave.
+    """
+    from models.message import ChatMessage, Role
+
+    ctx = _get_context()
+    _init_stores(ctx)
+    chat_svc = ctx["chat"]
+
+    console.print(Panel.fit(
+        "[bold blue]ResearchCopilot Chat[/bold blue] — multi-turn mode\n"
+        "[dim]Ask follow-up questions; context is remembered.\n"
+        "Type 'exit', 'quit', or an empty line to leave.[/dim]"
+    ))
+
+    # In-memory conversation history (trimmed to recent turns)
+    history: list[ChatMessage] = []
+    MAX_HISTORY = 6  # keep last 3 Q&A pairs
+
+    async def _ask(question):
+        result = await chat_svc.ask(
+            question, conversation_history=history or None, top_k=top_k
+        )
+        return result
+
+    while True:
+        try:
+            question = console.input("\n[bold green]You:[/bold green] ").strip()
+        except (EOFError, KeyboardInterrupt):
+            console.print("\n[dim]Bye![/dim]")
+            break
+
+        if not question or question.lower() in ("exit", "quit"):
+            console.print("[dim]Bye![/dim]")
+            break
+
+        result = asyncio.run(_ask(question))
+
+        console.print("\n[bold blue]Copilot:[/bold blue]")
+        console.print(Markdown(result.answer))
+        _render_citations(result.citations)
+
+        # Update history and trim to recent turns
+        history.append(ChatMessage(role=Role.USER, content=question))
+        history.append(ChatMessage(role=Role.ASSISTANT, content=result.answer))
+        if len(history) > MAX_HISTORY:
+            history[:] = history[-MAX_HISTORY:]
+
 
 
 @cli.command()
