@@ -19,6 +19,23 @@ Paper chunks:
 {chunks}"""
 
 
+COMPARE_PROMPT = """You are a research assistant. Compare the following scientific papers side by side.
+
+Focus on: {focus}
+
+For the comparison, address these dimensions across all papers:
+1. Research objective / problem addressed
+2. Methods / approach
+3. Key findings and performance data (cite specific numbers where available)
+4. Strengths and limitations
+5. How they differ and what they agree on
+
+Reference each paper by its number [1], [2], etc.
+
+Papers:
+{papers}"""
+
+
 class SummarizeService(BaseSummarizeService):
     def __init__(self, llm: BaseLLMProvider, meta_store: BaseMetadataStore, file_store=None):
         self._llm = llm
@@ -57,3 +74,36 @@ class SummarizeService(BaseSummarizeService):
         )
 
         return ServiceResponse(answer=answer, citations=[citation])
+
+    async def compare(self, document_ids: list[str],
+                      focus: str | None = None) -> ServiceResponse:
+        focus_text = focus or "general comparison"
+        paper_blocks = []
+        citations = []
+
+        for i, doc_id in enumerate(document_ids):
+            doc = await self._meta_store.get_document(doc_id)
+            chunks = await self._meta_store.get_chunks_by_document(doc_id)
+            # Use up to the first 5 chunks per paper to stay within context
+            excerpt = "\n\n".join(c.content for c in chunks[:5])
+            title = doc.title if doc else f"Document {doc_id}"
+            paper_blocks.append(f"[{i+1}] {title}:\n{excerpt}")
+
+            file_path = None
+            if doc and doc.file_path and self._file_store:
+                file_path = str(self._file_store.get_path(doc.file_path))
+            citations.append(Citation(
+                document_id=doc_id,
+                title=doc.title if doc else "Unknown",
+                authors=doc.authors if doc else "",
+                year=doc.year if doc else None,
+                journal=doc.journal if doc else None,
+                file_path=file_path,
+            ))
+
+        prompt = COMPARE_PROMPT.format(
+            focus=focus_text, papers="\n\n---\n\n".join(paper_blocks)
+        )
+        answer = await self._llm.chat([ChatMessage(role=Role.USER, content=prompt)])
+
+        return ServiceResponse(answer=answer, citations=citations)

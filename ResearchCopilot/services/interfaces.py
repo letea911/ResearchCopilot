@@ -25,3 +25,6 @@ class BaseSummarizeService(ABC):
     @abstractmethod
     async def summarize(self, document_id: str,
                         focus: str | None = None) -> ServiceResponse: ...
+    @abstractmethod
+    async def compare(self, document_ids: list[str],
+                      focus: str | None = None) -> ServiceResponse: ...
