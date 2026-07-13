@@ -40,9 +40,14 @@ C:/ProgramData/anaconda3/python.exe -m cli.main ask "你的问题"
   - ✅ 新增乱码检测 `_looks_garbled` + 标题误判检测 `_looks_like_title`
   - ✅ P0-2：`research ingest-dir` 批量导入命令
   - ✅ 导入 40 篇真实高熵 LDH 论文，重提取后 38/40 拿到干净作者名
-  - ✅ 测试：127/128 PASS（1 个 pre-existing 幂等测试无关失败）
-- **遇到问题**: PDF 文本提取质量差导致作者乱码；LLM 仅在字段为空时兜底不够 → 改为检测乱码/标题误判也触发
-- **明日计划**: P1 优化（Chunk 按 section 切分 + 对话历史多轮追问）
+  - ✅ **P1-A**：Section 切分 + 页码溯源 —— chunker 识别论文章节（Introduction/Methods/Results/Conclusion）+ 计算页码，引用显示 "Results And Discussion, p.1"
+  - ✅ 修复 section 检测：双栏 PDF 整页合成一段，改逐行扫描标题
+  - ✅ ChatService 从 SQLite 回查 section/page（兼容旧向量库）
+  - ✅ **P1-B**：`research chat` 交互式多轮对话（内存维护 history，支持追问）
+  - ✅ 重建 40 篇 651 chunks 的 section + 页码
+  - ✅ 测试：全模块 PASS（1 个 pre-existing 幂等测试无关失败）
+- **遇到问题**: PDF 文本提取质量差导致作者乱码（LLM 兜底）；section 标题在双栏 PDF 页中间行（改逐行扫描）；旧向量库无 section metadata（改 SQLite 回查）
+- **明日计划**: P2（BibTeX 解析器 + compare() 多篇对比）
 
 ### 2026-07-07
 - **今日目标**: Phase 4 — DeepSeek 替换 + 端到端验证 MVP

@@ -80,7 +80,17 @@ class ChatService(BaseChatService):
                     else:
                         file_paths[doc_id] = None
 
-        # 6. Build citations from retrieved sources
+        # 6. Backfill section/page from SQLite when vector metadata lacks them
+        #    (vectors ingested before section support have no section in ChromaDB)
+        chunk_meta: dict[str, tuple[str | None, int | None]] = {}
+        if self._meta_store:
+            for chunk in retrieved:
+                if chunk.metadata.get("section") is None:
+                    rec = await self._meta_store.get_chunk_by_chroma_id(chunk.chunk_id)
+                    if rec:
+                        chunk_meta[chunk.chunk_id] = (rec.section, rec.page_number)
+
+        # 7. Build citations from retrieved sources
         citations = [
             Citation(
                 document_id=chunk.document_id,
@@ -90,8 +100,10 @@ class ChatService(BaseChatService):
                 journal=chunk.metadata.get("journal"),
                 chunk_id=chunk.chunk_id,
                 snippet=chunk.content[:200],
-                page_number=chunk.metadata.get("page_number"),
-                section=chunk.metadata.get("section"),
+                page_number=chunk.metadata.get("page_number")
+                    or chunk_meta.get(chunk.chunk_id, (None, None))[1],
+                section=chunk.metadata.get("section")
+                    or chunk_meta.get(chunk.chunk_id, (None, None))[0],
                 file_path=file_paths.get(chunk.document_id),
             )
             for chunk in retrieved
