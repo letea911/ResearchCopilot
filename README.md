@@ -1,6 +1,7 @@
 # ResearchCopilot
 
 AI-powered research literature assistant.
+C:/ProgramData/anaconda3/python.exe -m cli.main ask "你的问题"
 
 ---
 
@@ -29,6 +30,19 @@ AI-powered research literature assistant.
 ---
 
 ## 📋 每日开发日志 (Daily Dev Log)
+
+### 2026-07-08
+- **今日目标**: Phase 5 实用性增强 — 引用溯源 + 元数据质量 + 批量导入
+- **完成事项**:
+  - ✅ 增强引用：Citation 增加 journal/page/file_path，CLI 显示 `📚 References` + `📄 Open PDF`（Ctrl+click 跳转原文）
+  - ✅ P0-1：LLM 辅助元数据提取（regex 优先，DeepSeek 兜底乱码/标题误判/错误年份）
+  - ✅ 修复 regex bug：作者清理误删 a-e 字母（Hybrid→Hyri）
+  - ✅ 新增乱码检测 `_looks_garbled` + 标题误判检测 `_looks_like_title`
+  - ✅ P0-2：`research ingest-dir` 批量导入命令
+  - ✅ 导入 40 篇真实高熵 LDH 论文，重提取后 38/40 拿到干净作者名
+  - ✅ 测试：127/128 PASS（1 个 pre-existing 幂等测试无关失败）
+- **遇到问题**: PDF 文本提取质量差导致作者乱码；LLM 仅在字段为空时兜底不够 → 改为检测乱码/标题误判也触发
+- **明日计划**: P1 优化（Chunk 按 section 切分 + 对话历史多轮追问）
 
 ### 2026-07-07
 - **今日目标**: Phase 4 — DeepSeek 替换 + 端到端验证 MVP

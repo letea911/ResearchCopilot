@@ -6,9 +6,9 @@
 
 ## 当前状态
 
-- 📅 最后更新：2026-07-07
-- 🔄 当前阶段：Phase 4 完成 → MVP 可用 🎉
-- ⏳ 下一里程碑：导入真实论文，开始科研使用
+- 📅 最后更新：2026-07-08
+- 🔄 当前阶段：Phase 5 — 实用性增强（引用 + 元数据 + 批量导入）
+- ⏳ 下一里程碑：P1 优化（Chunk 按 section 切分 + 对话历史）
 
 ---
 
@@ -96,6 +96,20 @@
 **测试总计：全量 PASS ✅**
 **MVP 状态：可用 🎉**
 
+### Phase 5: 实用性增强 ⬅ 进行中
+
+| 任务 | 状态 | 日期 |
+|---|---|---|
+| 增强引用（journal + page + file_path，Ctrl+click 打开 PDF） | ✅ | 2026-07-08 |
+| LLM 辅助元数据提取（regex 优先，DeepSeek 兜底乱码/标题误判） | ✅ | 2026-07-08 |
+| `research ingest-dir` 批量导入命令 | ✅ | 2026-07-08 |
+| 真实文献库：40 篇高熵 LDH，38/40 拿到干净作者名 | ✅ | 2026-07-08 |
+| P1: Chunk 按 section 切分 | ⬜ | - |
+| P1: 对话历史支持（多轮追问） | ⬜ | - |
+| P2: BibTeX 解析器 + compare() 多篇对比 | ⬜ | - |
+
+**已知限制：** 少数 PDF 作者仍误提取（软件用户名如 Administrator/lgq）；journal 偶有关键词误报（Science）
+
 ### Future: 后续版本
 
 | 模块 | 说明 |
@@ -137,6 +151,7 @@
 
 | 日期 | 关键进展 |
 |---|---|
+| 2026-07-08 | Phase 5：增强引用 + PDF 直达 + LLM 元数据提取 + ingest-dir 批量导入（38/40 干净作者）|
 | 2026-07-07 | Phase 4 完成！DeepSeek API 调通 + 本地 BGE Embedding + 端到端 `research ask` 可运行 |
 | 2026-06-28 | Phase 1 + 2 + 3 全部完成！95/95 PASS。Storage + AI + Ingestion + Retrieval + Services + CLI |
 | 2026-06-27 | Phase 1 Task 3-6：ChatMessage + Provider Interfaces + OpenAI LLM + Embedding Provider |

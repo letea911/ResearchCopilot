@@ -159,8 +159,10 @@ class RuleBasedMetadataExtractor(BaseMetadataExtractor):
             # Must have at least 2+ groups of letters (words)
             words = [w for w in re.findall(r"[A-Za-zÀ-ɏ]+", line) if len(w) > 1]
             if len(words) >= 2:
-                # Clean superscripts, affiliation markers
-                cleaned = re.sub(r"[¹²³⁴⁵⁶⁷⁸⁹⁰abcde,*†‡§¶@]", "", line)
+                # Clean superscript digits and affiliation symbols only.
+                # NOTE: do NOT strip a-e letters — that mangles real names
+                # (e.g. "Hybrid Supercapacitor" → "Hyri Suprpitor").
+                cleaned = re.sub(r"[¹²³⁴⁵⁶⁷⁸⁹⁰*†‡§¶]", "", line)
                 # Remove parenthetical content (affiliations)
                 cleaned = re.sub(r"\([^)]*\)", "", cleaned)
                 cleaned = re.sub(r"\s{2,}", " ", cleaned).strip()
@@ -226,24 +228,89 @@ class LLMMetadataExtractor(BaseMetadataExtractor):
         # Stage 1: rule-based
         doc = await self._rule_based.extract(chunked)
 
-        # Stage 2: LLM fallback for missing fields
-        if self._llm and (not doc.authors or not doc.journal):
+        # Stage 2: LLM fallback when regex results are missing OR look garbled.
+        # PDF text extraction often produces mangled author names (missing
+        # vowels) and mis-matched journals, so we validate quality, not just
+        # presence.
+        needs_llm = (
+            not doc.authors
+            or not doc.journal
+            or self._looks_garbled(doc.authors)
+            or self._looks_like_title(doc.authors)
+        )
+        if self._llm and needs_llm:
             try:
                 llm_fields = await self._extract_via_llm(chunked)
-                if not doc.authors and llm_fields.get("authors"):
+                # LLM authors override regex when regex is empty/garbled/title-like
+                if llm_fields.get("authors") and (
+                    not doc.authors
+                    or self._looks_garbled(doc.authors)
+                    or self._looks_like_title(doc.authors)
+                ):
                     doc.authors = llm_fields["authors"]
-                if not doc.journal and llm_fields.get("journal"):
+                # LLM journal overrides regex when regex is empty
+                if llm_fields.get("journal") and not doc.journal:
                     doc.journal = llm_fields["journal"]
-                if doc.year is None and llm_fields.get("year"):
+                # LLM year fills missing or fixes out-of-range years
+                if llm_fields.get("year") and (
+                    doc.year is None or not (1980 <= (doc.year or 0) <= 2027)
+                ):
                     try:
-                        doc.year = int(llm_fields["year"])
+                        y = int(llm_fields["year"])
+                        if 1980 <= y <= 2027:
+                            doc.year = y
                     except (ValueError, TypeError):
                         pass
                 # Never override title with LLM — regex title is usually fine
             except Exception:
                 pass  # LLM failed — keep regex results
 
+        # Sanity: drop clearly-wrong regex years even without LLM
+        if doc.year is not None and not (1980 <= doc.year <= 2027):
+            doc.year = None
+
         return doc
+
+    @staticmethod
+    def _looks_garbled(text: str | None) -> bool:
+        """Detect garbled author strings from bad PDF extraction.
+
+        Heuristic: real names have vowels. Garbled PDF text like
+        'Boosting Hyri Suprpitor Prformn' has words with few/no vowels.
+        """
+        if not text:
+            return False
+        words = [w for w in re.findall(r"[A-Za-z]+", text) if len(w) >= 4]
+        if not words:
+            return False
+        vowels = set("aeiouAEIOU")
+        vowelless = sum(1 for w in words if not (set(w) & vowels))
+        # If >30% of 4+ letter words lack vowels, it's garbled
+        return (vowelless / len(words)) > 0.3
+
+    # Common words that appear in paper titles but never in author name lists
+    _TITLE_WORDS = {
+        "boosting", "enhanced", "enhancing", "novel", "study", "studies",
+        "performance", "hybrid", "synthesis", "analysis", "investigation",
+        "engineering", "efficient", "high", "electrode", "material",
+        "materials", "toward", "towards", "via", "for", "using", "based",
+        "structure", "structural", "electrocatalyst", "catalysis", "oxygen",
+        "evolution", "reaction", "supercapacitor", "electrochemical",
+        "review", "application", "applications", "design", "strategy",
+    }
+
+    @classmethod
+    def _looks_like_title(cls, text: str | None) -> bool:
+        """Detect when the 'authors' field is actually title text.
+
+        Rule-based extraction sometimes grabs a title continuation line
+        instead of the author list. Real author strings don't contain
+        title vocabulary like 'Boosting', 'Performance', 'Hybrid'.
+        """
+        if not text:
+            return False
+        words = {w.lower() for w in re.findall(r"[A-Za-z]+", text)}
+        return len(words & cls._TITLE_WORDS) >= 1
 
     async def _extract_via_llm(self, chunked: ChunkedDocument) -> dict:
         """Send first chunk's beginning to LLM, get structured metadata back."""
