@@ -19,6 +19,10 @@ rich>=13.0.0
 prompt-toolkit>=3.0.0
 click>=8.0.0
 
+# GUI (Phase 6 — PyQt5 chosen over PySide6 due to Anaconda Qt DLL conflict)
+PyQt5>=5.15.0
+qasync>=0.27.0
+
 # Testing
 pytest>=8.0.0
 pytest-asyncio>=0.23.0

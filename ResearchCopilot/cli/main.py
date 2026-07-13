@@ -35,58 +35,9 @@ def _render_citations(citations):
 
 
 def _build_context():
-    """Build the application context — all wired dependencies."""
-    from config.loader import load_config
-    from providers.llm.deepseek import DeepSeekProvider
-    from providers.embedding.local import LocalEmbeddingProvider
-    from storage.file_store import LocalFileStore
-    from storage.sqlite_meta import SQLiteMetadataStore
-    from storage.chroma_vector import ChromaVectorStore
-    from ingestion.pipeline import IngestionPipeline
-    from ingestion.parsers.pdf import PyMuPDFParser
-    from ingestion.normalizer import TextNormalizer
-    from ingestion.chunker import ScientificChunker
-    from ingestion.metadata import LLMMetadataExtractor
-    from retrieval.keyword import SQLiteFTS5Retriever
-    from retrieval.vector import ChromaVectorRetriever
-    from retrieval.hybrid import WeightedHybridRetriever
-    from services.chat import ChatService
-    from services.search import SearchService
-    from services.summarize import SummarizeService
-
-    llm_cfg, emb_cfg, chunk_cfg, storage_cfg = load_config()
-
-    llm = DeepSeekProvider(llm_cfg)
-    embedder = LocalEmbeddingProvider(emb_cfg)
-
-    file_store = LocalFileStore(storage_cfg)
-    meta_store = SQLiteMetadataStore(storage_cfg)
-    vector_store = ChromaVectorStore(storage_cfg)
-
-    keyword_retriever = SQLiteFTS5Retriever(storage_cfg)
-    vector_retriever = ChromaVectorRetriever(vector_store, meta_store)
-    hybrid_retriever = WeightedHybridRetriever(keyword_retriever, vector_retriever)
-
-    pipeline = IngestionPipeline(
-        parsers={".pdf": PyMuPDFParser()},
-        normalizer=TextNormalizer(),
-        chunker=ScientificChunker(chunk_cfg),
-        metadata_extractor=LLMMetadataExtractor(llm),
-        embedder=embedder,
-        file_store=file_store,
-        meta_store=meta_store,
-        vector_store=vector_store,
-    )
-
-    chat = ChatService(llm, embedder, hybrid_retriever, meta_store, file_store)
-    search = SearchService(embedder, hybrid_retriever)
-    summarize = SummarizeService(llm, meta_store, file_store)
-
-    return {
-        "llm": llm, "embedder": embedder,
-        "file_store": file_store, "meta_store": meta_store, "vector_store": vector_store,
-        "pipeline": pipeline, "chat": chat, "search": search, "summarize": summarize,
-    }
+    """Build the application context — delegates to shared core.context."""
+    from core.context import build_context
+    return build_context()
 
 
 _app_ctx = None
@@ -101,10 +52,8 @@ def _get_context():
 
 def _init_stores(ctx):
     """Initialize stores (create tables, connect)."""
-    async def _init():
-        await ctx["meta_store"].initialize()
-        await ctx["vector_store"].initialize()
-    asyncio.run(_init())
+    from core.context import initialize_stores
+    asyncio.run(initialize_stores(ctx))
 
 
 @click.group()
@@ -321,8 +270,50 @@ def summarize(document_id, focus):
 
 
 @cli.command()
-@click.option("--doc-type", default=None, help="Filter by document type")
-@click.option("--limit", default=20, help="Number of documents to list")
+@click.argument("document_ids", nargs=-1, required=True)
+@click.option("--focus", default=None, help="Focus: methods, results, performance")
+def compare(document_ids, focus):
+    """Compare multiple documents side by side. Pass 2+ document IDs."""
+    if len(document_ids) < 2:
+        console.print("[yellow]Provide at least 2 document IDs to compare.[/yellow]")
+        return
+    ctx = _get_context()
+    _init_stores(ctx)
+    svc = ctx["summarize"]
+
+    async def _run():
+        result = await svc.compare(list(document_ids), focus=focus)
+        console.print(Markdown(result.answer))
+        _render_citations(result.citations)
+
+    asyncio.run(_run())
+
+
+@cli.command()
+@click.argument("bibfile", type=click.Path(exists=True, dir_okay=False))
+def enrich(bibfile):
+    """Fix garbled PDF metadata using a Zotero-exported .bib file."""
+    from services.enrich import MetadataEnricher
+
+    ctx = _get_context()
+    _init_stores(ctx)
+    enricher = MetadataEnricher(ctx["meta_store"])
+
+    async def _run():
+        result = await enricher.enrich_from_bib(Path(bibfile))
+        console.print(
+            f"[bold]Enrich done.[/bold] "
+            f"Entries: {result['total_entries']}, "
+            f"[green]Matched: {result['matched']}[/green], "
+            f"Updated: {result['updated']}, "
+            f"[dim]Unmatched: {len(result['unmatched'])}[/dim]"
+        )
+        if result["unmatched"]:
+            console.print("\n[dim]Unmatched entries:[/dim]")
+            for t in result["unmatched"][:10]:
+                console.print(f"  [dim]· {t}[/dim]")
+
+    asyncio.run(_run())
 def list_docs(doc_type, limit):
     """List documents in the knowledge base."""
     ctx = _get_context()
