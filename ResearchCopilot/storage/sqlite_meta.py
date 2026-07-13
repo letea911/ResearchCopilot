@@ -167,6 +167,26 @@ class SQLiteMetadataStore(BaseMetadataStore):
             return None
         return self._row_to_chunk(row)
 
+    async def update_document_metadata(
+        self, document_id, authors=None, year=None, journal=None, doi=None
+    ) -> None:
+        sets, params = [], []
+        if authors is not None:
+            sets.append("authors = ?"); params.append(authors)
+        if year is not None:
+            sets.append("year = ?"); params.append(year)
+        if journal is not None:
+            sets.append("journal = ?"); params.append(journal)
+        if doi is not None:
+            sets.append("doi = ?"); params.append(doi)
+        if not sets:
+            return
+        params.append(document_id)
+        await self._conn.execute(
+            f"UPDATE documents SET {', '.join(sets)} WHERE id = ?", params
+        )
+        await self._conn.commit()
+
     def _row_to_document(self, row) -> DocumentRecord:
         import json
         extra = row["extra"]

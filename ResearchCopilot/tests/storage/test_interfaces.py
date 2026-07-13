@@ -23,6 +23,7 @@ class FakeMetadataStore(BaseMetadataStore):
     async def insert_chunks(self, chunks): pass
     async def get_chunks_by_document(self, document_id): return []
     async def get_chunk_by_chroma_id(self, chroma_id): return None
+    async def update_document_metadata(self, document_id, authors=None, year=None, journal=None, doi=None): pass
 
 
 class FakeVectorStore(BaseVectorStore):

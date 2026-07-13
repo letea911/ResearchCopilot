@@ -70,6 +70,17 @@ class BaseMetadataStore(ABC):
         """Find a chunk by its ChromaDB vector ID."""
         ...
 
+    @abstractmethod
+    async def update_document_metadata(
+        self, document_id: str,
+        authors: str | None = None,
+        year: int | None = None,
+        journal: str | None = None,
+        doi: str | None = None,
+    ) -> None:
+        """Update only the provided (non-None) metadata fields of a document."""
+        ...
+
 
 class BaseVectorStore(ABC):
     """Vector storage and similarity search — ChromaDB-backed."""
