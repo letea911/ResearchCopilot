@@ -23,7 +23,7 @@ def _build_context():
     from ingestion.parsers.pdf import PyMuPDFParser
     from ingestion.normalizer import TextNormalizer
     from ingestion.chunker import ScientificChunker
-    from ingestion.metadata import RuleBasedMetadataExtractor
+    from ingestion.metadata import LLMMetadataExtractor
     from retrieval.keyword import SQLiteFTS5Retriever
     from retrieval.vector import ChromaVectorRetriever
     from retrieval.hybrid import WeightedHybridRetriever
@@ -48,7 +48,7 @@ def _build_context():
         parsers={".pdf": PyMuPDFParser()},
         normalizer=TextNormalizer(),
         chunker=ScientificChunker(chunk_cfg),
-        metadata_extractor=RuleBasedMetadataExtractor(),
+        metadata_extractor=LLMMetadataExtractor(llm),
         embedder=embedder,
         file_store=file_store,
         meta_store=meta_store,

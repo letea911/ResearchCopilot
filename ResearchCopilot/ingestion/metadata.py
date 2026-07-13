@@ -203,3 +203,82 @@ class RuleBasedMetadataExtractor(BaseMetadataExtractor):
             if journal.lower() in filename.lower():
                 return journal
         return None
+
+
+import json
+
+
+class LLMMetadataExtractor(BaseMetadataExtractor):
+    """Two-stage metadata extractor: regex first, LLM fallback.
+
+    Stage 1: RuleBasedMetadataExtractor (fast, free)
+    Stage 2: LLM (DeepSeek) for any missing fields (authors, journal, year)
+
+    Cost: ~100 tokens per paper when LLM is needed.
+    """
+
+    def __init__(self, llm_provider=None):
+        """llm_provider: any BaseLLMProvider instance. If None, LLM fallback is skipped."""
+        self._rule_based = RuleBasedMetadataExtractor()
+        self._llm = llm_provider
+
+    async def extract(self, chunked: ChunkedDocument) -> DocumentRecord:
+        # Stage 1: rule-based
+        doc = await self._rule_based.extract(chunked)
+
+        # Stage 2: LLM fallback for missing fields
+        if self._llm and (not doc.authors or not doc.journal):
+            try:
+                llm_fields = await self._extract_via_llm(chunked)
+                if not doc.authors and llm_fields.get("authors"):
+                    doc.authors = llm_fields["authors"]
+                if not doc.journal and llm_fields.get("journal"):
+                    doc.journal = llm_fields["journal"]
+                if doc.year is None and llm_fields.get("year"):
+                    try:
+                        doc.year = int(llm_fields["year"])
+                    except (ValueError, TypeError):
+                        pass
+                # Never override title with LLM — regex title is usually fine
+            except Exception:
+                pass  # LLM failed — keep regex results
+
+        return doc
+
+    async def _extract_via_llm(self, chunked: ChunkedDocument) -> dict:
+        """Send first chunk's beginning to LLM, get structured metadata back."""
+        from models.message import ChatMessage, Role
+
+        # Take first 800 chars of content (enough for title + authors + journal header)
+        text_sample = chunked.chunks[0].text[:800] if chunked.chunks else ""
+        filename = chunked.source_path
+
+        prompt = f"""Extract bibliographic metadata from this scientific paper excerpt.
+Return ONLY valid JSON, no other text.
+
+{{
+  "title": "full paper title",
+  "authors": "LastName1 FirstInitial, LastName2 FirstInitial",
+  "year": 2024,
+  "journal": "full journal name"
+}}
+
+Filename: {filename}
+
+Excerpt:
+{text_sample}"""
+
+        messages = [
+            ChatMessage(role=Role.SYSTEM, content="You are a bibliographic metadata extractor. Return only valid JSON."),
+            ChatMessage(role=Role.USER, content=prompt),
+        ]
+
+        response = await self._llm.chat(messages, temperature=0.0, max_tokens=200)
+
+        # Parse JSON from response (handle ```json wrappers)
+        response = response.strip()
+        if response.startswith("```"):
+            response = response.split("\n", 1)[1]
+            if response.endswith("```"):
+                response = response[:-3]
+        return json.loads(response)
