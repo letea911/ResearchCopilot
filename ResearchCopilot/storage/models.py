@@ -31,6 +31,7 @@ class ChunkRecord:
     page_number: int | None = None
     start_offset: int | None = None
     end_offset: int | None = None
+    section: str | None = None
 
 
 @dataclass

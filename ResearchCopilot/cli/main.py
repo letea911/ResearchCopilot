@@ -185,6 +185,8 @@ def ask(question, top_k, stream):
                         parts.append(f"[italic]{c.journal}[/italic]")
                     if c.year:
                         parts.append(str(c.year))
+                    if c.section:
+                        parts.append(c.section)
                     if c.page_number:
                         parts.append(f"p.{c.page_number}")
                     line = ", ".join(parts)

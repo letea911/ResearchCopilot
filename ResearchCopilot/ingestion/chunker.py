@@ -1,7 +1,14 @@
+import re
 import uuid
 from config.model import ChunkConfig
 from ingestion.interfaces import BaseChunker
 from ingestion.models import ParsedDocument, ChunkedDocument, ChunkText
+
+
+SECTION_RE = re.compile(
+    r"^\s*(?:\d+\.?\s*)?(Abstract|Introduction|Experimental|Methods?|Materials?|Results?(?:\s+and\s+Discussion)?|Discussion|Conclusions?|References|Acknowledge?ments?)\b",
+    re.IGNORECASE,
+)
 
 
 class ScientificChunker(BaseChunker):
@@ -12,25 +19,50 @@ class ScientificChunker(BaseChunker):
     2. If a paragraph exceeds chunk_size, split by sentence boundaries
     3. Apply chunk_overlap between consecutive chunks
     4. Assign chunk positions (chunk_index, start_offset, end_offset)
+    5. Track the current paper section and compute page numbers per chunk
     """
 
     def __init__(self, config: ChunkConfig | None = None):
         self._config = config or ChunkConfig()
 
+    def _build_page_ends(self, page_texts: list[str]) -> list[int]:
+        """Cumulative page-end offsets matching the "\\n\\n".join() layout."""
+        page_ends: list[int] = []
+        cumulative = 0
+        for page_text in page_texts:
+            cumulative += len(page_text) + 2  # +2 for the "\n\n" join separator
+            page_ends.append(cumulative)
+        return page_ends
+
+    def _page_for_offset(self, offset: int | None, page_ends: list[int]) -> int | None:
+        """Return the 1-indexed page a given start_offset falls into."""
+        if not page_ends or offset is None:
+            return None
+        for i, end in enumerate(page_ends):
+            if offset < end:
+                return i + 1
+        return len(page_ends)
+
     def chunk(self, parsed: ParsedDocument) -> ChunkedDocument:
         text = parsed.content
         paragraphs = text.split("\n\n")
+        page_ends = self._build_page_ends(parsed.page_texts)
 
         chunks: list[ChunkText] = []
         current_chunk_parts: list[str] = []
         current_length = 0
         current_start = 0
         chunk_index = 0
+        current_section: str | None = None
 
         for para in paragraphs:
             para = para.strip()
             if not para:
                 continue
+
+            match = SECTION_RE.match(para)
+            if match:
+                current_section = match.group(1).title()
 
             para_len = len(para)
 
@@ -45,6 +77,8 @@ class ScientificChunker(BaseChunker):
                     text=chunk_text,
                     start_offset=current_start,
                     end_offset=end_offset,
+                    section=current_section,
+                    page_number=self._page_for_offset(current_start, page_ends),
                 ))
                 chunk_index += 1
 
@@ -72,6 +106,8 @@ class ScientificChunker(BaseChunker):
                 text=chunk_text,
                 start_offset=current_start,
                 end_offset=current_start + len(chunk_text),
+                section=current_section,
+                page_number=self._page_for_offset(current_start, page_ends),
             ))
 
         return ChunkedDocument(

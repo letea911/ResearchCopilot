@@ -59,6 +59,7 @@ class SQLiteFTS5Retriever(BaseKeywordRetriever):
             try:
                 sql = """
                     SELECT c.id as chunk_id, c.content, c.document_id,
+                           c.section, c.page_number,
                            d.title, d.authors, d.year, d.journal, d.document_type
                     FROM chunks c
                     JOIN documents d ON c.document_id = d.id
@@ -85,6 +86,7 @@ class SQLiteFTS5Retriever(BaseKeywordRetriever):
                     conditions = " OR ".join(["c.content LIKE ?" for _ in like_terms])
                     sql = f"""
                         SELECT c.id as chunk_id, c.content, c.document_id,
+                               c.section, c.page_number,
                                d.title, d.authors, d.year, d.journal, d.document_type
                         FROM chunks c
                         JOIN documents d ON c.document_id = d.id
@@ -112,6 +114,8 @@ class SQLiteFTS5Retriever(BaseKeywordRetriever):
                         "year": row["year"],
                         "journal": row["journal"] or "",
                         "document_type": row["document_type"],
+                        "section": row["section"],
+                        "page_number": row["page_number"],
                     },
                 )
                 for row in rows

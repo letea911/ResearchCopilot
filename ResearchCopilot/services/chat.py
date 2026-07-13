@@ -91,6 +91,7 @@ class ChatService(BaseChatService):
                 chunk_id=chunk.chunk_id,
                 snippet=chunk.content[:200],
                 page_number=chunk.metadata.get("page_number"),
+                section=chunk.metadata.get("section"),
                 file_path=file_paths.get(chunk.document_id),
             )
             for chunk in retrieved

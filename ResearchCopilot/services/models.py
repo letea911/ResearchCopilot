@@ -13,6 +13,7 @@ class Citation:
     chunk_id: str | None = None
     snippet: str | None = None
     page_number: int | None = None
+    section: str | None = None
     file_path: str | None = None  # absolute path to PDF for file:// link
 
 

@@ -107,6 +107,8 @@ class IngestionPipeline:
                         "document_type": doc_record.document_type,
                         "title": doc_record.title,
                         "chunk_index": i,
+                        "section": chunk_text.section,
+                        "page_number": chunk_text.page_number,
                     },
                 ))
 
@@ -120,6 +122,7 @@ class IngestionPipeline:
                     page_number=chunk_text.page_number,
                     start_offset=chunk_text.start_offset,
                     end_offset=chunk_text.end_offset,
+                    section=chunk_text.section,
                 ))
 
             await self._vector_store.add(vector_docs)

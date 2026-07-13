@@ -29,8 +29,11 @@ class ChromaVectorRetriever(BaseVectorRetriever):
                     "title": r.metadata.get("title", ""),
                     "document_type": r.metadata.get("document_type", ""),
                     "chunk_index": r.metadata.get("chunk_index"),
+                    "section": r.metadata.get("section"),
+                    "page_number": r.metadata.get("page_number"),
                     **{k: v for k, v in r.metadata.items()
-                       if k not in ("document_id", "title", "document_type", "chunk_index")},
+                       if k not in ("document_id", "title", "document_type",
+                                    "chunk_index", "section", "page_number")},
                 },
             )
             for r in results

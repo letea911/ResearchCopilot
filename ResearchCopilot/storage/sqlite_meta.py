@@ -48,6 +48,7 @@ class SQLiteMetadataStore(BaseMetadataStore):
                 page_number INTEGER,
                 start_offset INTEGER,
                 end_offset INTEGER,
+                section TEXT,
                 FOREIGN KEY (document_id) REFERENCES documents(id)
             );
 
@@ -64,6 +65,13 @@ class SQLiteMetadataStore(BaseMetadataStore):
             INSERT INTO documents_fts(documents_fts) VALUES('rebuild');
         """)
         await self._conn.commit()
+
+        # Idempotent migration for existing DBs missing the section column
+        try:
+            await self._conn.execute("ALTER TABLE chunks ADD COLUMN section TEXT")
+            await self._conn.commit()
+        except Exception:
+            pass  # column already exists
 
     async def insert_document(self, doc: DocumentRecord) -> None:
         import json
@@ -129,13 +137,13 @@ class SQLiteMetadataStore(BaseMetadataStore):
     async def insert_chunks(self, chunks: list[ChunkRecord]) -> None:
         await self._conn.executemany(
             """INSERT INTO chunks (id, document_id, chunk_index, content,
-               chroma_id, token_count, page_number, start_offset, end_offset)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               chroma_id, token_count, page_number, start_offset, end_offset, section)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             [
                 (
                     c.id, c.document_id, c.chunk_index, c.content,
                     c.chroma_id, c.token_count, c.page_number,
-                    c.start_offset, c.end_offset,
+                    c.start_offset, c.end_offset, c.section,
                 )
                 for c in chunks
             ],
@@ -189,4 +197,5 @@ class SQLiteMetadataStore(BaseMetadataStore):
             page_number=row["page_number"],
             start_offset=row["start_offset"],
             end_offset=row["end_offset"],
+            section=row["section"] if "section" in row.keys() else None,
         )

@@ -21,8 +21,13 @@ class ChromaVectorStore(BaseVectorStore):
     async def add(self, docs: list[VectorDocument]) -> None:
         if not docs:
             return
-        # ChromaDB rejects empty dict metadata; convert to None
-        metadatas = [d.metadata if d.metadata else None for d in docs]
+        # ChromaDB rejects empty dict metadata and None-valued keys;
+        # strip None values and convert empty dicts to None.
+        def _clean(md: dict) -> dict | None:
+            cleaned = {k: v for k, v in md.items() if v is not None}
+            return cleaned or None
+
+        metadatas = [_clean(d.metadata) for d in docs]
         self._collection.add(
             ids=[d.id for d in docs],
             embeddings=[d.embedding for d in docs],

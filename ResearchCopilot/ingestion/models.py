@@ -9,6 +9,7 @@ class ParsedDocument:
     content: str
     source_type: str              # "pdf" | "bibtex" | "markdown"
     raw_metadata: dict = field(default_factory=dict)
+    page_texts: list[str] = field(default_factory=list)  # each page's text, for page-number calculation
 
 
 @dataclass
@@ -21,6 +22,7 @@ class ChunkText:
     page_number: int | None = None
     start_offset: int | None = None
     end_offset: int | None = None
+    section: str | None = None
 
 
 @dataclass

@@ -73,3 +73,50 @@ def test_chunker_offsets():
     assert len(result.chunks) == 1  # fits in one chunk
     assert result.chunks[0].start_offset == 0
     assert result.chunks[0].end_offset > 0
+
+
+def test_chunker_assigns_sections():
+    """Section headings should propagate to the chunks under them."""
+    c = ScientificChunker(ChunkConfig(chunk_size=40, chunk_overlap=0))
+    content = (
+        "Introduction\n\n"
+        "This work studies catalysis in depth here.\n\n"
+        "Methods\n\n"
+        "We used DFT calculations on many surfaces."
+    )
+    parsed = ParsedDocument(source_path="test.pdf", content=content, source_type="pdf")
+    result = c.chunk(parsed)
+
+    sections = {ch.section for ch in result.chunks}
+    assert "Introduction" in sections
+    assert "Methods" in sections
+    # Every chunk carries a section label once the first heading is seen
+    assert all(ch.section is not None for ch in result.chunks)
+
+
+def test_chunker_page_numbers_from_page_texts():
+    """page_number is computed from page_texts offsets when provided."""
+    page1 = "Introduction\n\n" + ("a" * 200)
+    page2 = "Methods\n\n" + ("b" * 200)
+    content = "\n\n".join([page1, page2])
+    parsed = ParsedDocument(
+        source_path="test.pdf",
+        content=content,
+        source_type="pdf",
+        page_texts=[page1, page2],
+    )
+    c = ScientificChunker(ChunkConfig(chunk_size=150, chunk_overlap=0))
+    result = c.chunk(parsed)
+
+    pages = {ch.page_number for ch in result.chunks}
+    assert 1 in pages
+    assert 2 in pages
+    assert all(ch.page_number is not None for ch in result.chunks)
+
+
+def test_chunker_page_number_none_without_page_texts():
+    """page_number stays None when no page_texts are supplied."""
+    c = ScientificChunker(ChunkConfig(chunk_size=1024, chunk_overlap=0))
+    parsed = ParsedDocument(source_path="test.pdf", content="Some text.", source_type="pdf")
+    result = c.chunk(parsed)
+    assert result.chunks[0].page_number is None

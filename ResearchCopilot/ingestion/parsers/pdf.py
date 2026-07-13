@@ -33,6 +33,7 @@ class PyMuPDFParser(BaseParser):
                 content=content,
                 source_type="pdf",
                 raw_metadata=raw_metadata,
+                page_texts=full_text,
             )
         finally:
             doc.close()
