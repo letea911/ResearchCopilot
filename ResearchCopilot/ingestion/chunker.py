@@ -43,6 +43,24 @@ class ScientificChunker(BaseChunker):
                 return i + 1
         return len(page_ends)
 
+    def _detect_section(self, para: str) -> str | None:
+        """Scan each line of a paragraph for a section heading.
+
+        Real PDFs (esp. two-column) merge a whole page into one paragraph,
+        so the heading like '1. Introduction' sits on an interior line rather
+        than the paragraph start. Returns the LAST heading found (closest to
+        the text that follows), or None.
+        """
+        found: str | None = None
+        for line in para.split("\n"):
+            line = line.strip()
+            if not line or len(line) > 60:  # headings are short lines
+                continue
+            m = SECTION_RE.match(line)
+            if m:
+                found = m.group(1).title()
+        return found
+
     def chunk(self, parsed: ParsedDocument) -> ChunkedDocument:
         text = parsed.content
         paragraphs = text.split("\n\n")
@@ -60,9 +78,9 @@ class ScientificChunker(BaseChunker):
             if not para:
                 continue
 
-            match = SECTION_RE.match(para)
-            if match:
-                current_section = match.group(1).title()
+            detected = self._detect_section(para)
+            if detected:
+                current_section = detected
 
             para_len = len(para)
 
