@@ -63,6 +63,14 @@ def test_summarize_requires_document_id(runner):
     assert result.exit_code != 0
 
 
+def test_ingest_dir_command_help(runner):
+    """ingest-dir command should exist and show help."""
+    from cli.main import cli
+    result = runner.invoke(cli, ["ingest-dir", "--help"])
+    assert result.exit_code == 0
+    assert "Batch ingest" in result.output
+
+
 def test_list_command_help(runner):
     """list-docs command help should work."""
     from cli.main import cli

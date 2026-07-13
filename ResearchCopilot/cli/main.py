@@ -111,6 +111,51 @@ def ingest(path):
 
 
 @cli.command()
+@click.argument("dir_path", type=click.Path(exists=True, file_okay=False, dir_okay=True))
+@click.option("--pattern", default="*.pdf", help="File pattern to match (default: *.pdf)")
+def ingest_dir(dir_path, pattern):
+    """Batch ingest all PDFs in a directory."""
+    ctx = _get_context()
+    _init_stores(ctx)
+    pipeline = ctx["pipeline"]
+    meta_store = ctx["meta_store"]
+
+    import glob as glob_mod
+    files = sorted(Path(dir_path).glob(pattern))
+    # Filter to only files (not subdirectories)
+    pdf_files = [f for f in files if f.is_file()]
+
+    if not pdf_files:
+        console.print(f"[yellow]No files matching '{pattern}' found in {dir_path}[/yellow]")
+        return
+
+    console.print(f"Found [bold]{len(pdf_files)}[/bold] files. Starting import...\n")
+
+    async def _run():
+        ok, fail, skip = 0, 0, 0
+        for i, pdf in enumerate(pdf_files):
+            try:
+                doc_id = await pipeline.ingest(pdf)
+                if doc_id and len(doc_id) > 0:
+                    ok += 1
+                    console.print(f"[{i+1}/{len(pdf_files)}] [green]OK[/green] {pdf.name[:60]}")
+            except Exception as e:
+                err = str(e)
+                if "already imported" in err.lower() or "skip" in err.lower():
+                    skip += 1
+                    console.print(f"[{i+1}/{len(pdf_files)}] [dim]SKIP[/dim] {pdf.name[:60]}")
+                else:
+                    fail += 1
+                    console.print(f"[{i+1}/{len(pdf_files)}] [red]FAIL[/red] {pdf.name[:60]} — {err[:50]}")
+
+        docs = await meta_store.list_documents(limit=10000)
+        console.print(f"\n[bold]Done.[/bold] OK: {ok}, Failed: {fail}, Skipped: {skip}")
+        console.print(f"Total documents: {len(docs)}")
+
+    asyncio.run(_run())
+
+
+@cli.command()
 @click.argument("question")
 @click.option("--top-k", default=10, help="Number of chunks to retrieve")
 @click.option("--stream/--no-stream", default=True, help="Stream the response")
