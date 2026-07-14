@@ -5,6 +5,8 @@ import asyncio
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTextBrowser, QLineEdit, QPushButton
 )
+from PyQt5.QtGui import QDesktopServices
+from PyQt5.QtCore import QUrl
 
 from models.message import ChatMessage, Role
 
@@ -20,7 +22,11 @@ class ChatPanel(QWidget):
 
         self.browser = QTextBrowser()
         self.browser.setReadOnly(True)
-        self.browser.setOpenExternalLinks(True)
+        # 不让 QTextBrowser 自己加载链接（否则会把 PDF 二进制塞进窗口显示成乱码）。
+        # 改为拦截点击，用系统默认程序在外部打开。
+        self.browser.setOpenLinks(False)
+        self.browser.setOpenExternalLinks(False)
+        self.browser.anchorClicked.connect(self._on_link_clicked)
         layout.addWidget(self.browser, stretch=1)
 
         input_row = QHBoxLayout()
@@ -41,6 +47,10 @@ class ChatPanel(QWidget):
     def set_input_enabled(self, enabled: bool) -> None:
         self.input.setEnabled(enabled)
         self.send_btn.setEnabled(enabled)
+
+    def _on_link_clicked(self, url: QUrl) -> None:
+        """打开引用链接：用系统默认程序在外部打开（PDF 用系统阅读器）。"""
+        QDesktopServices.openUrl(url)
 
     def set_context(self, ctx: dict) -> None:
         self.ctx = ctx
