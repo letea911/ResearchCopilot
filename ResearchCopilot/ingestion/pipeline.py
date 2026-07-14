@@ -47,8 +47,8 @@ class IngestionPipeline:
                 hasher.update(chunk)
         return hasher.hexdigest()
 
-    async def ingest(self, source: Path) -> str:
-        """Ingest a single file. Returns document_id. Idempotent via file hash."""
+    async def ingest(self, source: Path, collection: str = "默认库") -> str:
+        """Ingest a single file into a library. Returns document_id. Idempotent via file hash."""
         file_hash = self._compute_hash(source)
 
         # Idempotency check: skip if source file already matches a stored file_path
@@ -74,6 +74,8 @@ class IngestionPipeline:
 
         # 4. Extract metadata
         doc_record = await self._metadata_extractor.extract(chunked)
+        # Assign the target library (single membership)
+        doc_record.collection = collection or "默认库"
         # Store file hash in extra for dedup, preserve real DOI
         if doc_record.extra is None:
             doc_record.extra = {}
@@ -105,6 +107,7 @@ class IngestionPipeline:
                     metadata={
                         "document_id": doc_record.id,
                         "document_type": doc_record.document_type,
+                        "collection": doc_record.collection,
                         "title": doc_record.title,
                         "chunk_index": i,
                         "section": chunk_text.section,
@@ -130,12 +133,12 @@ class IngestionPipeline:
 
         return doc_record.id
 
-    async def ingest_batch(self, sources: list[Path]) -> list[str]:
-        """Ingest multiple files. Returns list of document_ids."""
+    async def ingest_batch(self, sources: list[Path], collection: str = "默认库") -> list[str]:
+        """Ingest multiple files into a library. Returns list of document_ids."""
         results = []
         for source in sources:
             try:
-                doc_id = await self.ingest(source)
+                doc_id = await self.ingest(source, collection=collection)
                 results.append(doc_id)
             except Exception as e:
                 results.append(f"ERROR:{source}:{e}")
