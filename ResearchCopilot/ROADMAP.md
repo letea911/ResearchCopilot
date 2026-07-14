@@ -6,8 +6,8 @@
 
 ## 当前状态
 
-- 📅 最后更新：2026-07-08
-- 🔄 当前阶段：Phase 6 — 桌面 GUI（PyQt5）完成
+- 📅 最后更新：2026-07-14
+- 🔄 当前阶段：Phase 6 — 桌面 GUI（PyQt5）打磨中
 - ⏳ 下一里程碑：用户亲测 GUI；后续 Experiments 模块
 
 ---
@@ -152,6 +152,7 @@
 
 | 日期 | 关键进展 |
 |---|---|
+| 2026-07-14 | Phase 6 打磨：修双击闪退（python 指向 Anaconda）+ 引用PDF改系统外部打开（不再窗口内乱码）+ 双击文献一键总结 + 聊天区“思考中”自动消失/自动滚底 |
 | 2026-07-08 | Phase 6：PyQt5 桌面 GUI（聊天+文献列表+拖拽导入）；Phase 5 补全 P2（enrich 元数据修正 + compare 多篇对比）|
 | 2026-07-08 | Phase 5：增强引用 + PDF 直达 + LLM 元数据提取 + ingest-dir + P1（section/页码溯源 + chat 多轮对话）|
 | 2026-07-07 | Phase 4 完成！DeepSeek API 调通 + 本地 BGE Embedding + 端到端 `research ask` 可运行 |

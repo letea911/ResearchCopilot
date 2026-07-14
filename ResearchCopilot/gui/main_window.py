@@ -43,6 +43,9 @@ class MainWindow(QMainWindow):
         splitter.setSizes([280, 720])
         outer.addWidget(splitter, stretch=1)
 
+        # 双击左侧文献 → 聊天区总结这篇
+        self.library_panel.summarize_requested.connect(self.chat_panel.request_summary)
+
         self.setCentralWidget(central)
 
         asyncio.ensure_future(self._startup())
