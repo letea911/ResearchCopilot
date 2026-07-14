@@ -38,7 +38,8 @@ C:/ProgramData/anaconda3/python.exe -m cli.main ask "你的问题"
   - ✅ 修引用 PDF 乱码：QTextBrowser 不再自己加载 `file:///`，改 `QDesktopServices.openUrl` 用系统默认阅读器外部打开
   - ✅ 一键总结该篇：双击左侧文献 → 聊天区直接出 AI 摘要（复用 `summarize` 服务，零业务改动）
   - ✅ 聊天区小修：“思考中…”答完自动删除 + 每次追加自动滚到底
-  - ✅ 验证：GUI import OK；`tests/cli` 10/10 PASS（未碰 CLI，无回归）
+  - ✅ 修界面“未响应”：`LocalEmbeddingProvider.embed()` 的模型加载/编码移到后台线程（`run_in_executor`），不再阻塞 qasync 事件循环=界面线程（顺带修好每次提问/拖拽导入的短暂卡顿）
+  - ✅ 验证：GUI import OK；`tests/cli` 10/10 PASS + `test_local` 3/3 PASS（未碰 CLI，无回归）
 - **遇到问题**: 双击 .bat 的 `python` 指向不确定（PATH 里三个 python）→ 写死路径；`file://` 链接被 QTextBrowser 当文档加载 → 改外部打开
 - **明日计划**: 用户亲测；后续 Experiments 实验数据模块
 
