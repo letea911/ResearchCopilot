@@ -47,13 +47,22 @@ class SQLiteFTS5Retriever(BaseKeywordRetriever):
         return " ".join(f'"{t}"' for t in terms)
 
     async def search(
-        self, query: str, top_k: int = 10, document_type: str | None = None
+        self, query: str, top_k: int = 10, document_type: str | None = None,
+        collections: list[str] | None = None,
     ) -> list[RetrievedChunk]:
         async with aiosqlite.connect(self._db_path) as conn:
             conn.row_factory = aiosqlite.Row
 
             fts_query = self._extract_keywords(query)
             rows = []
+
+            def _collection_clause(params: list) -> str:
+                """Append collection IN (...) filter; mutates params."""
+                if not collections:
+                    return ""
+                placeholders = ", ".join("?" for _ in collections)
+                params.extend(collections)
+                return f" AND d.collection IN ({placeholders})"
 
             # Strategy 1: Try FTS5 MATCH
             try:
@@ -71,6 +80,7 @@ class SQLiteFTS5Retriever(BaseKeywordRetriever):
                 if document_type:
                     sql += " AND d.document_type = ?"
                     params.append(document_type)
+                sql += _collection_clause(params)
                 sql += " ORDER BY d.rowid LIMIT ?"
                 params.append(top_k)
 
@@ -96,6 +106,7 @@ class SQLiteFTS5Retriever(BaseKeywordRetriever):
                     if document_type:
                         sql += " AND d.document_type = ?"
                         params.append(document_type)
+                    sql += _collection_clause(params)
                     sql += " LIMIT ?"
                     params.append(top_k)
 

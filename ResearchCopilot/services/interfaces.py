@@ -8,17 +8,20 @@ class BaseChatService(ABC):
     @abstractmethod
     async def ask(self, question: str,
                   conversation_history: list[ChatMessage] | None = None,
-                  top_k: int = 10) -> ServiceResponse: ...
+                  top_k: int = 10,
+                  collections: list[str] | None = None) -> ServiceResponse: ...
     @abstractmethod
     async def ask_stream(self, question: str,
                          conversation_history: list[ChatMessage] | None = None,
-                         top_k: int = 10) -> AsyncIterator[str]: ...
+                         top_k: int = 10,
+                         collections: list[str] | None = None) -> AsyncIterator[str]: ...
 
 
 class BaseSearchService(ABC):
     @abstractmethod
     async def search(self, query: str, top_k: int = 20,
-                     document_type: str | None = None) -> SearchResponse: ...
+                     document_type: str | None = None,
+                     collections: list[str] | None = None) -> SearchResponse: ...
 
 
 class BaseSummarizeService(ABC):

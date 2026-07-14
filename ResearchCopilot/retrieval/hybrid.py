@@ -20,14 +20,30 @@ class WeightedHybridRetriever(BaseHybridRetriever):
         embedding: list[float],
         top_k: int = 10,
         document_type: str | None = None,
+        collections: list[str] | None = None,
         keyword_weight: float = 0.3,
         vector_weight: float = 0.7,
     ) -> list[RetrievedChunk]:
+        # Build the vector-side metadata filter (this closes the gap where the
+        # vector retriever was previously called with no filter at all).
+        conditions = []
+        if document_type:
+            conditions.append({"document_type": document_type})
+        if collections:
+            conditions.append({"collection": {"$in": list(collections)}})
+        if len(conditions) == 1:
+            where = conditions[0]
+        elif len(conditions) > 1:
+            where = {"$and": conditions}
+        else:
+            where = None
+
         # Run both retrievals with wider top_k for better fusion
         kw_results = await self._keyword.search(
-            query, top_k=top_k * 2, document_type=document_type
+            query, top_k=top_k * 2, document_type=document_type,
+            collections=collections,
         )
-        vec_results = await self._vector.search(embedding, top_k=top_k * 2)
+        vec_results = await self._vector.search(embedding, top_k=top_k * 2, where=where)
 
         # RRF: score = sum(weight * 1/(k + rank)) per result
         scores: dict[str, tuple[RetrievedChunk, float]] = {}

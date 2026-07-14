@@ -11,6 +11,7 @@ class BaseKeywordRetriever(ABC):
         query: str,
         top_k: int = 10,
         document_type: str | None = None,
+        collections: list[str] | None = None,
     ) -> list[RetrievedChunk]:
         """Search by keyword query. Returns chunks with metadata."""
         ...
@@ -40,6 +41,7 @@ class BaseHybridRetriever(ABC):
         embedding: list[float],
         top_k: int = 10,
         document_type: str | None = None,
+        collections: list[str] | None = None,
         keyword_weight: float = 0.3,
         vector_weight: float = 0.7,
     ) -> list[RetrievedChunk]:

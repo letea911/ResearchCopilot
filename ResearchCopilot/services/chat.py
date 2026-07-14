@@ -36,13 +36,16 @@ class ChatService(BaseChatService):
         self, question: str,
         conversation_history: list[ChatMessage] | None = None,
         top_k: int = 10,
+        collections: list[str] | None = None,
     ) -> ServiceResponse:
         # 1. Embed the question
         embeddings = await self._embedder.embed([question])
         query_embedding = embeddings[0]
 
-        # 2. Retrieve relevant chunks
-        retrieved = await self._retriever.search(question, query_embedding, top_k=top_k)
+        # 2. Retrieve relevant chunks (optionally scoped to selected libraries)
+        retrieved = await self._retriever.search(
+            question, query_embedding, top_k=top_k, collections=collections
+        )
 
         # 3. Build prompt with context
         context_parts = []
@@ -115,10 +118,13 @@ class ChatService(BaseChatService):
         self, question: str,
         conversation_history: list[ChatMessage] | None = None,
         top_k: int = 10,
+        collections: list[str] | None = None,
     ):
         embeddings = await self._embedder.embed([question])
         query_embedding = embeddings[0]
-        retrieved = await self._retriever.search(question, query_embedding, top_k=top_k)
+        retrieved = await self._retriever.search(
+            question, query_embedding, top_k=top_k, collections=collections
+        )
 
         context_parts = []
         for i, chunk in enumerate(retrieved):

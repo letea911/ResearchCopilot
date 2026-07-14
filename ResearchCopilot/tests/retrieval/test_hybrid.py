@@ -60,7 +60,7 @@ async def test_hybrid_honors_top_k(retriever, mock_keyword, mock_vector):
 async def test_hybrid_passes_document_type_to_keyword(retriever, mock_keyword):
     await retriever.search("query", [0.1], document_type="literature")
     mock_keyword.search.assert_called_once_with(
-        "query", top_k=20, document_type="literature"
+        "query", top_k=20, document_type="literature", collections=None
     )
 
 
@@ -68,5 +68,20 @@ async def test_hybrid_passes_document_type_to_keyword(retriever, mock_keyword):
 async def test_hybrid_requests_wider_top_k(retriever, mock_keyword, mock_vector):
     await retriever.search("query", [0.1], top_k=10)
     # Should request top_k * 2 from each sub-retriever for better fusion
-    mock_keyword.search.assert_called_once_with("query", top_k=20, document_type=None)
-    mock_vector.search.assert_called_once_with([0.1], top_k=20)
+    mock_keyword.search.assert_called_once_with(
+        "query", top_k=20, document_type=None, collections=None
+    )
+    mock_vector.search.assert_called_once_with([0.1], top_k=20, where=None)
+
+
+@pytest.mark.asyncio
+async def test_hybrid_passes_collections_filter(retriever, mock_keyword, mock_vector):
+    await retriever.search("query", [0.1], top_k=10, collections=["OER", "LDH"])
+    # keyword gets the collections list
+    mock_keyword.search.assert_called_once_with(
+        "query", top_k=20, document_type=None, collections=["OER", "LDH"]
+    )
+    # vector gets a where filter built from collections ($in) — closes the old gap
+    mock_vector.search.assert_called_once_with(
+        [0.1], top_k=20, where={"collection": {"$in": ["OER", "LDH"]}}
+    )
