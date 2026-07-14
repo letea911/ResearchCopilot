@@ -50,9 +50,20 @@ class BaseMetadataStore(ABC):
         self,
         document_type: str | None = None,
         year: int | None = None,
+        collection: str | None = None,
         limit: int = 50,
     ) -> list[DocumentRecord]:
         """List documents with optional filters."""
+        ...
+
+    @abstractmethod
+    async def list_collections(self) -> list[str]:
+        """List all library (collection) names, including empty ones."""
+        ...
+
+    @abstractmethod
+    async def create_collection(self, name: str) -> None:
+        """Create a named library (idempotent)."""
         ...
 
     @abstractmethod
@@ -108,4 +119,10 @@ class BaseVectorStore(ABC):
     @abstractmethod
     async def count(self) -> int:
         """Return the total number of vectors in the store."""
+        ...
+
+    @abstractmethod
+    async def backfill_metadata(self, key: str, value: str) -> int:
+        """Set metadata[key]=value on every vector currently missing that key.
+        Returns the number of vectors updated. Used for one-off migrations."""
         ...

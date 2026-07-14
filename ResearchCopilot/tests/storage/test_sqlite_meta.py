@@ -146,3 +146,45 @@ async def test_duplicate_document_id_raises(store):
     await store.insert_document(doc)
     with pytest.raises(Exception):
         await store.insert_document(doc)
+
+
+@pytest.mark.asyncio
+async def test_document_default_collection(store):
+    await store.insert_document(DocumentRecord(
+        id="c-def", document_type="literature", title="No lib specified"))
+    result = await store.get_document("c-def")
+    assert result.collection == "默认库"
+
+
+@pytest.mark.asyncio
+async def test_list_documents_filter_by_collection(store):
+    await store.insert_document(DocumentRecord(
+        id="oer-1", document_type="literature", title="OER paper",
+        collection="OER"))
+    await store.insert_document(DocumentRecord(
+        id="ldh-1", document_type="literature", title="LDH paper",
+        collection="LDH"))
+
+    oer = await store.list_documents(collection="OER")
+    assert len(oer) == 1
+    assert oer[0].id == "oer-1"
+
+
+@pytest.mark.asyncio
+async def test_list_and_create_collections(store):
+    # 默认库 is always seeded
+    assert "默认库" in await store.list_collections()
+
+    await store.create_collection("OER")
+    await store.create_collection("OER")  # idempotent
+    cols = await store.list_collections()
+    assert "OER" in cols
+    assert cols.count("OER") == 1
+
+
+@pytest.mark.asyncio
+async def test_insert_document_registers_collection(store):
+    await store.insert_document(DocumentRecord(
+        id="auto-lib", document_type="literature", title="Auto",
+        collection="高熵"))
+    assert "高熵" in await store.list_collections()

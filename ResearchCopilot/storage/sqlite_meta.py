@@ -35,6 +35,12 @@ class SQLiteMetadataStore(BaseMetadataStore):
                 source_type TEXT DEFAULT 'pdf',
                 file_path TEXT,
                 extra TEXT,
+                collection TEXT DEFAULT '默认库',
+                created_at TEXT DEFAULT ''
+            );
+
+            CREATE TABLE IF NOT EXISTS collections (
+                name TEXT PRIMARY KEY,
                 created_at TEXT DEFAULT ''
             );
 
@@ -73,20 +79,47 @@ class SQLiteMetadataStore(BaseMetadataStore):
         except Exception:
             pass  # column already exists
 
+        # Idempotent migration: add `collection` to existing documents (backfills 默认库)
+        try:
+            await self._conn.execute(
+                "ALTER TABLE documents ADD COLUMN collection TEXT DEFAULT '默认库'"
+            )
+            await self._conn.commit()
+        except Exception:
+            pass  # column already exists
+
+        # Seed the collections table: always ensure 默认库 exists, and absorb any
+        # library names already present on documents (so historical data shows up).
+        await self._conn.execute(
+            "INSERT OR IGNORE INTO collections (name) VALUES ('默认库')"
+        )
+        await self._conn.execute(
+            """INSERT OR IGNORE INTO collections (name)
+               SELECT DISTINCT collection FROM documents
+               WHERE collection IS NOT NULL AND collection != ''"""
+        )
+        await self._conn.commit()
+
     async def insert_document(self, doc: DocumentRecord) -> None:
         import json
         await self._conn.execute(
             """INSERT INTO documents (id, document_type, title, authors, year,
                journal, doi, keywords, abstract, source_type, file_path,
-               extra, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               extra, collection, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 doc.id, doc.document_type, doc.title, doc.authors,
                 doc.year, doc.journal, doc.doi, doc.keywords,
                 doc.abstract, doc.source_type, doc.file_path,
                 json.dumps(doc.extra) if doc.extra else None,
+                doc.collection or "默认库",
                 doc.created_at,
             ),
+        )
+        # Ensure the library exists in the collections table
+        await self._conn.execute(
+            "INSERT OR IGNORE INTO collections (name) VALUES (?)",
+            (doc.collection or "默认库",),
         )
         # Rebuild FTS index to compensate for missing content-sync triggers
         await self._conn.execute(
@@ -117,6 +150,7 @@ class SQLiteMetadataStore(BaseMetadataStore):
         self,
         document_type: str | None = None,
         year: int | None = None,
+        collection: str | None = None,
         limit: int = 50,
     ) -> list[DocumentRecord]:
         query = "SELECT * FROM documents WHERE 1=1"
@@ -127,12 +161,34 @@ class SQLiteMetadataStore(BaseMetadataStore):
         if year is not None:
             query += " AND year = ?"
             params.append(year)
+        if collection is not None:
+            query += " AND collection = ?"
+            params.append(collection)
         query += " ORDER BY created_at DESC LIMIT ?"
         params.append(limit)
 
         cursor = await self._conn.execute(query, params)
         rows = await cursor.fetchall()
         return [self._row_to_document(r) for r in rows]
+
+    async def list_collections(self) -> list[str]:
+        """List all library names (including empty ones)."""
+        cursor = await self._conn.execute(
+            "SELECT name FROM collections ORDER BY name"
+        )
+        rows = await cursor.fetchall()
+        return [r["name"] for r in rows]
+
+    async def create_collection(self, name: str) -> None:
+        """Create a named library (idempotent)."""
+        name = (name or "").strip()
+        if not name:
+            return
+        await self._conn.execute(
+            "INSERT OR IGNORE INTO collections (name, created_at) VALUES (?, '')",
+            (name,),
+        )
+        await self._conn.commit()
 
     async def insert_chunks(self, chunks: list[ChunkRecord]) -> None:
         await self._conn.executemany(
@@ -203,6 +259,7 @@ class SQLiteMetadataStore(BaseMetadataStore):
             source_type=row["source_type"],
             file_path=row["file_path"],
             extra=json.loads(extra) if extra else None,
+            collection=(row["collection"] if "collection" in row.keys() else None) or "默认库",
             created_at=row["created_at"],
         )
 

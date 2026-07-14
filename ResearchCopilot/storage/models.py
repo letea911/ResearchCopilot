@@ -16,6 +16,7 @@ class DocumentRecord:
     source_type: str = "pdf"       # "pdf" | "bibtex" | "doi" | "markdown"
     file_path: str | None = None
     extra: dict | None = None      # domain-specific extension field
+    collection: str = "默认库"      # 所属文献库（单属，像文件夹）
     created_at: str = ""
 
 

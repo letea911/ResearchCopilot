@@ -70,3 +70,27 @@ class ChromaVectorStore(BaseVectorStore):
 
     async def count(self) -> int:
         return self._collection.count()
+
+    async def backfill_metadata(self, key: str, value: str) -> int:
+        """Set metadata[key]=value on every vector currently missing that key.
+
+        Fetches all existing vectors' metadata (no embeddings), finds those
+        without `key`, and updates only their metadata — vectors are NOT
+        recomputed. Returns the number updated.
+        """
+        got = self._collection.get(include=["metadatas"])
+        ids = got.get("ids") or []
+        metadatas = got.get("metadatas") or []
+
+        upd_ids, upd_mds = [], []
+        for i, vid in enumerate(ids):
+            md = metadatas[i] if i < len(metadatas) and metadatas[i] else {}
+            if md.get(key) in (None, ""):
+                new_md = dict(md)
+                new_md[key] = value
+                upd_ids.append(vid)
+                upd_mds.append(new_md)
+
+        if upd_ids:
+            self._collection.update(ids=upd_ids, metadatas=upd_mds)
+        return len(upd_ids)
