@@ -314,6 +314,11 @@ def enrich(bibfile):
                 console.print(f"  [dim]· {t}[/dim]")
 
     asyncio.run(_run())
+
+
+@cli.command(name="list-docs")
+@click.option("--doc-type", default=None, help="Filter by document type")
+@click.option("--limit", default=20, help="Number of documents to list")
 def list_docs(doc_type, limit):
     """List documents in the knowledge base."""
     ctx = _get_context()

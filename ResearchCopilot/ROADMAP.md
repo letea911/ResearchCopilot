@@ -7,8 +7,8 @@
 ## 当前状态
 
 - 📅 最后更新：2026-07-08
-- 🔄 当前阶段：Phase 5 — P1 完成（Section 切分 + 对话历史）
-- ⏳ 下一里程碑：P2（BibTeX 解析器 + compare 多篇对比）
+- 🔄 当前阶段：Phase 6 — 桌面 GUI（PyQt5）完成
+- ⏳ 下一里程碑：用户亲测 GUI；后续 Experiments 模块
 
 ---
 
@@ -131,6 +131,7 @@
 | 元数据 | SQLite + FTS5 | 全文搜索 |
 | PDF 解析 | PyMuPDF | 支持双栏/图表 |
 | CLI | rich + prompt_toolkit + click | 终端美化 |
+| GUI | PyQt5 + qasync | 桌面界面（PySide6 因 Anaconda DLL 冲突弃用）|
 | 语言 | Python 3.12+ | async/await 全异步 |
 
 ---
@@ -151,6 +152,7 @@
 
 | 日期 | 关键进展 |
 |---|---|
+| 2026-07-08 | Phase 6：PyQt5 桌面 GUI（聊天+文献列表+拖拽导入）；Phase 5 补全 P2（enrich 元数据修正 + compare 多篇对比）|
 | 2026-07-08 | Phase 5：增强引用 + PDF 直达 + LLM 元数据提取 + ingest-dir + P1（section/页码溯源 + chat 多轮对话）|
 | 2026-07-07 | Phase 4 完成！DeepSeek API 调通 + 本地 BGE Embedding + 端到端 `research ask` 可运行 |
 | 2026-06-28 | Phase 1 + 2 + 3 全部完成！95/95 PASS。Storage + AI + Ingestion + Retrieval + Services + CLI |

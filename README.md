@@ -31,6 +31,18 @@ C:/ProgramData/anaconda3/python.exe -m cli.main ask "你的问题"
 
 ## 📋 每日开发日志 (Daily Dev Log)
 
+### 2026-07-14
+- **今日目标**: Phase 6 — 桌面图形界面（GUI）
+- **完成事项**:
+  - ✅ 抽出 `core/context.py`（共享依赖构建，CLI 和 GUI 都用，CLI 未破坏）
+  - ✅ 框架决策：PySide6 在 Anaconda 有 Qt DLL 冲突 → 改用 PyQt5 + qasync（已卸载 PySide6）
+  - ✅ PyQt5 桌面界面：`gui/main.py`（qasync 入口）+ `main_window.py`（布局+拖拽+后台加载模型）+ `chat_panel.py`（问答+引用+PDF跳转+多轮历史）+ `library_panel.py`（文献列表+库状态）
+  - ✅ `run_gui.bat` 双击启动脚本
+  - ✅ 导入 + 离屏构造测试通过（窗口对象可正常创建）
+  - ✅ 修复 list-docs 装饰器再次回归（补回 `@cli.command(name="list-docs")`，CLI 10/10 PASS）
+- **遇到问题**: PySide6 6.11 与 Anaconda 自带 PyQt5 的 Qt DLL 撞车（procedure not found）→ 改用环境已有的 PyQt5；list-docs 装饰器多次回归（这次确认落地）
+- **明日计划**: 用户亲测 GUI（双击 run_gui.bat）；后续 Experiments 实验数据模块
+
 ### 2026-07-08
 - **今日目标**: Phase 5 实用性增强 — 引用溯源 + 元数据质量 + 批量导入
 - **完成事项**:
