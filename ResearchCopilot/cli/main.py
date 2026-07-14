@@ -69,14 +69,16 @@ def cli(ctx):
 
 @cli.command()
 @click.argument("path", type=click.Path(exists=True))
-def ingest(path):
+@click.option("--collection", default="默认库", help="Target library to import into")
+def ingest(path, collection):
     """Ingest a PDF paper into the knowledge base."""
     ctx = _get_context()
     _init_stores(ctx)
 
     async def _run():
-        doc_id = await ctx["pipeline"].ingest(Path(path))
+        doc_id = await ctx["pipeline"].ingest(Path(path), collection=collection)
         console.print(f"[green]✓[/green] Ingested: [bold]{path}[/bold]")
+        console.print(f"  Library: [cyan]{collection}[/cyan]")
         console.print(f"  Document ID: [dim]{doc_id}[/dim]")
 
     asyncio.run(_run())
@@ -85,7 +87,8 @@ def ingest(path):
 @cli.command()
 @click.argument("dir_path", type=click.Path(exists=True, file_okay=False, dir_okay=True))
 @click.option("--pattern", default="*.pdf", help="File pattern to match (default: *.pdf)")
-def ingest_dir(dir_path, pattern):
+@click.option("--collection", default="默认库", help="Target library to import into")
+def ingest_dir(dir_path, pattern, collection):
     """Batch ingest all PDFs in a directory."""
     ctx = _get_context()
     _init_stores(ctx)
@@ -101,13 +104,13 @@ def ingest_dir(dir_path, pattern):
         console.print(f"[yellow]No files matching '{pattern}' found in {dir_path}[/yellow]")
         return
 
-    console.print(f"Found [bold]{len(pdf_files)}[/bold] files. Starting import...\n")
+    console.print(f"Found [bold]{len(pdf_files)}[/bold] files. Importing into [cyan]{collection}[/cyan]...\n")
 
     async def _run():
         ok, fail, skip = 0, 0, 0
         for i, pdf in enumerate(pdf_files):
             try:
-                doc_id = await pipeline.ingest(pdf)
+                doc_id = await pipeline.ingest(pdf, collection=collection)
                 if doc_id and len(doc_id) > 0:
                     ok += 1
                     console.print(f"[{i+1}/{len(pdf_files)}] [green]OK[/green] {pdf.name[:60]}")
@@ -131,20 +134,23 @@ def ingest_dir(dir_path, pattern):
 @click.argument("question")
 @click.option("--top-k", default=10, help="Number of chunks to retrieve")
 @click.option("--stream/--no-stream", default=True, help="Stream the response")
-def ask(question, top_k, stream):
+@click.option("--collection", "collections", multiple=True,
+              help="Limit to one or more libraries (repeatable). Omit = all.")
+def ask(question, top_k, stream, collections):
     """Ask a research question."""
     ctx = _get_context()
     _init_stores(ctx)
     chat = ctx["chat"]
+    cols = list(collections) or None
 
     async def _run():
         if stream:
             console.print("[dim]Thinking...[/dim]\n")
-            async for token in chat.ask_stream(question, top_k=top_k):
+            async for token in chat.ask_stream(question, top_k=top_k, collections=cols):
                 console.print(token, end="")
             console.print("\n")
         else:
-            result = await chat.ask(question, top_k=top_k)
+            result = await chat.ask(question, top_k=top_k, collections=cols)
             console.print(Markdown(result.answer))
             _render_citations(result.citations)
 
@@ -153,7 +159,9 @@ def ask(question, top_k, stream):
 
 @cli.command()
 @click.option("--top-k", default=10, help="Number of chunks to retrieve per turn")
-def chat(top_k):
+@click.option("--collection", "collections", multiple=True,
+              help="Limit to one or more libraries (repeatable). Omit = all.")
+def chat(top_k, collections):
     """Interactive multi-turn chat with conversation memory.
 
     Type your question and press Enter. Follow-up questions keep context.
@@ -164,6 +172,7 @@ def chat(top_k):
     ctx = _get_context()
     _init_stores(ctx)
     chat_svc = ctx["chat"]
+    cols = list(collections) or None
 
     console.print(Panel.fit(
         "[bold blue]ResearchCopilot Chat[/bold blue] — multi-turn mode\n"
@@ -177,7 +186,8 @@ def chat(top_k):
 
     async def _ask(question):
         result = await chat_svc.ask(
-            question, conversation_history=history or None, top_k=top_k
+            question, conversation_history=history or None, top_k=top_k,
+            collections=cols,
         )
         return result
 
@@ -210,14 +220,18 @@ def chat(top_k):
 @click.argument("query")
 @click.option("--top-k", default=20, help="Number of results")
 @click.option("--type", "doc_type", default=None, help="Filter by document type")
-def search_cmd(query, top_k, doc_type):
+@click.option("--collection", "collections", multiple=True,
+              help="Limit to one or more libraries (repeatable). Omit = all.")
+def search_cmd(query, top_k, doc_type, collections):
     """Search the knowledge base without LLM."""
     ctx = _get_context()
     _init_stores(ctx)
     svc = ctx["search"]
+    cols = list(collections) or None
 
     async def _run():
-        result = await svc.search(query, top_k=top_k, document_type=doc_type)
+        result = await svc.search(query, top_k=top_k, document_type=doc_type,
+                                  collections=cols)
         table = Table(title=f"Results for: {query}")
         table.add_column("#", style="dim")
         table.add_column("Title")
@@ -318,15 +332,18 @@ def enrich(bibfile):
 
 @cli.command(name="list-docs")
 @click.option("--doc-type", default=None, help="Filter by document type")
+@click.option("--collection", default=None, help="Filter by library")
 @click.option("--limit", default=20, help="Number of documents to list")
-def list_docs(doc_type, limit):
+def list_docs(doc_type, collection, limit):
     """List documents in the knowledge base."""
     ctx = _get_context()
     _init_stores(ctx)
     meta = ctx["meta_store"]
 
     async def _run():
-        docs = await meta.list_documents(document_type=doc_type, limit=limit)
+        docs = await meta.list_documents(
+            document_type=doc_type, collection=collection, limit=limit
+        )
         if not docs:
             console.print("[yellow]No documents found.[/yellow]")
             return
@@ -335,18 +352,59 @@ def list_docs(doc_type, limit):
         table.add_column("Title")
         table.add_column("Authors")
         table.add_column("Year")
-        table.add_column("Type")
+        table.add_column("Library", style="cyan")
 
         for d in docs:
             table.add_row(
                 d.id[:8],
-                d.title[:60],
-                (d.authors or "")[:25],
+                d.title[:55],
+                (d.authors or "")[:22],
                 str(d.year or ""),
-                d.document_type,
+                d.collection or "默认库",
             )
         console.print(table)
         console.print(f"[dim]{len(docs)} document(s)[/dim]")
+
+    asyncio.run(_run())
+
+
+@cli.command(name="list-collections")
+def list_collections_cmd():
+    """List all libraries (collections)."""
+    ctx = _get_context()
+    _init_stores(ctx)
+    meta = ctx["meta_store"]
+
+    async def _run():
+        names = await meta.list_collections()
+        if not names:
+            console.print("[yellow]No libraries yet.[/yellow]")
+            return
+        for name in names:
+            docs = await meta.list_documents(collection=name, limit=100000)
+            console.print(f"  [cyan]{name}[/cyan] — {len(docs)} 篇")
+
+    asyncio.run(_run())
+
+
+@cli.command(name="backfill-collections")
+@click.option("--value", default="默认库", help="Library name to assign to un-tagged vectors")
+def backfill_collections(value):
+    """One-off: tag existing vectors that lack a `collection` metadata key.
+
+    Run once after upgrading so historical vectors are included when filtering
+    by library. Only touches vectors missing the key; safe to re-run.
+    """
+    ctx = _get_context()
+    _init_stores(ctx)
+    vec = ctx["vector_store"]
+
+    async def _run():
+        updated = await vec.backfill_metadata("collection", value)
+        console.print(
+            f"[green]✓[/green] Backfilled [bold]{updated}[/bold] vectors "
+            f"with collection = [cyan]{value}[/cyan]."
+        )
 
     asyncio.run(_run())
 
