@@ -17,27 +17,28 @@ CLASSIFY_SYSTEM = (
 
 CLASSIFY_USER_TEMPLATE = """Paper title: {title}
 Authors: {authors}
-Library hierarchy (parent → sub-library):
+Library hierarchy (parent → sub-library). Choose the MOST SPECIFIC match:
 {collections}
 
 Full text:
 {chunks_text}
 
 Return a JSON object with these keys:
-- "keywords": list of 3-5 relevant scientific keywords
-- "abstract": concise 2-3 sentence summary of the paper
-- "suggested_parent": best-matching root library name (e.g. "电催化"), or "" if none fit
-- "suggested_collection": best-matching sub-library name (e.g. "高熵"), or "" if none fit
+- "keywords": list of 3-5 relevant scientific keywords (e.g. ["oxygen evolution reaction", "LDH", "density functional theory"])
+- "abstract": concise 2-3 sentence summary of what this paper studied and found
+- "suggested_parent": best-matching root library name, or "" if none fit
+- "suggested_collection": best-matching sub-library name (under the parent above), or "" if none fit
 - "new_parent": suggested new root library name if no existing parent fits, or ""
-- "new_collection": suggested new sub-library name (under parent or standalone), or ""
-- "confidence": number between 0.0 and 1.0
+- "new_collection": suggested new sub-library name, or ""
+- "confidence": number between 0.0 and 1.0 — your certainty in the suggested placement
 
-Rules:
-- Prefer placing papers in EXISTING sub-libraries when possible (fill suggested_parent + suggested_collection)
-- If the paper fits under an existing parent but needs a NEW sub-library, set suggested_parent="" and fill new_parent + new_collection
-- If no existing library fits at all, fill new_parent + new_collection
-- Leave new_* fields empty when existing libraries suffice
-- Prefer specific sub-libraries over generic ones"""
+Classification rules (MOST IMPORTANT):
+1. ALWAYS prefer the most SPECIFIC existing sub-library over generic ones. A paper about high-entropy LDH for OER should go to "电催化 → OER" or "电催化 → 高熵", NOT "默认库" or "临时库".
+2. NEVER place a paper in a generic catch-all library like "默认库" or "临时库" unless it genuinely doesn't fit ANY specific library. These are LAST RESORT.
+3. Match by scientific topic, method, and material system — not just by keywords in the title.
+4. If the paper fits an existing parent's theme but its specific sub-topic is missing, suggest a new sub-library (new_collection) under that parent.
+5. Only suggest a new parent (new_parent) if the paper's topic is completely unrepresented.
+6. Leave new_* fields empty when existing libraries already cover this paper's topic."""
 
 
 class ClassifierService(BaseClassifierService):
