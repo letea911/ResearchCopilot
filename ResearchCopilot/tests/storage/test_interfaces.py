@@ -26,6 +26,13 @@ class FakeMetadataStore(BaseMetadataStore):
     async def create_collection(self, name, parent=None): pass
     async def rename_collection(self, old_name, new_name): return True
     async def delete_collection(self, name, reassign_to="默认库"): return 0
+    async def create_reading_list(self, name, query=""): return "fake-id"
+    async def add_to_reading_list(self, list_id, document_ids): return len(document_ids)
+    async def remove_from_reading_list(self, list_id, document_id): pass
+    async def get_reading_lists(self): return []
+    async def get_reading_list_items(self, list_id): return []
+    async def rename_reading_list(self, list_id, new_name): return True
+    async def delete_reading_list(self, list_id): pass
     async def insert_chunks(self, chunks): pass
     async def get_chunks_by_document(self, document_id): return []
     async def get_chunk_by_chroma_id(self, chroma_id): return None

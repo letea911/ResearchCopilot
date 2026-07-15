@@ -64,6 +64,23 @@ class SQLiteMetadataStore(BaseMetadataStore):
             CREATE INDEX IF NOT EXISTS idx_documents_type ON documents(document_type);
             CREATE INDEX IF NOT EXISTS idx_documents_year ON documents(year);
 
+            CREATE TABLE IF NOT EXISTS reading_lists (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                query TEXT DEFAULT '',
+                created_at TEXT DEFAULT ''
+            );
+
+            CREATE TABLE IF NOT EXISTS reading_list_items (
+                list_id TEXT NOT NULL REFERENCES reading_lists(id) ON DELETE CASCADE,
+                document_id TEXT NOT NULL REFERENCES documents(id),
+                added_at TEXT DEFAULT '',
+                PRIMARY KEY (list_id, document_id)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_rli_list_id ON reading_list_items(list_id);
+            CREATE INDEX IF NOT EXISTS idx_rli_doc_id ON reading_list_items(document_id);
+
             CREATE VIRTUAL TABLE IF NOT EXISTS documents_fts USING fts5(
                 title, authors, keywords, abstract, content='documents', content_rowid='rowid'
             );
@@ -318,6 +335,109 @@ class SQLiteMetadataStore(BaseMetadataStore):
         await self._conn.commit()
 
         return moved
+
+    # ---- Reading Lists (virtual groups) -----------------------------------
+
+    async def create_reading_list(self, name: str, query: str = "") -> str:
+        """Create a virtual reading list. Returns the new list's UUID."""
+        import uuid
+        lid = str(uuid.uuid4())[:8]
+        name = (name or "").strip()
+        if not name:
+            return ""
+        await self._conn.execute(
+            "INSERT INTO reading_lists (id, name, query, created_at) VALUES (?, ?, ?, '')",
+            (lid, name, query),
+        )
+        await self._conn.commit()
+        return lid
+
+    async def add_to_reading_list(self, list_id: str, document_ids: list[str]) -> int:
+        """Add documents to a reading list. Returns count of newly added."""
+        if not list_id or not document_ids:
+            return 0
+        added = 0
+        for did in document_ids:
+            try:
+                await self._conn.execute(
+                    "INSERT OR IGNORE INTO reading_list_items (list_id, document_id, added_at) VALUES (?, ?, '')",
+                    (list_id, did),
+                )
+                added += 1
+            except Exception:
+                pass
+        await self._conn.commit()
+        return added
+
+    async def remove_from_reading_list(self, list_id: str, document_id: str) -> None:
+        await self._conn.execute(
+            "DELETE FROM reading_list_items WHERE list_id = ? AND document_id = ?",
+            (list_id, document_id),
+        )
+        await self._conn.commit()
+
+    async def get_reading_lists(self) -> list[dict]:
+        """Return all reading lists with document counts."""
+        cursor = await self._conn.execute(
+            """SELECT rl.id, rl.name, rl.query, rl.created_at,
+                      COUNT(rli.document_id) AS doc_count
+               FROM reading_lists rl
+               LEFT JOIN reading_list_items rli ON rl.id = rli.list_id
+               GROUP BY rl.id
+               ORDER BY rl.created_at DESC"""
+        )
+        rows = await cursor.fetchall()
+        return [dict(r) for r in rows]
+
+    async def get_reading_list_items(self, list_id: str) -> list[DocumentRecord]:
+        """Return all documents in a reading list."""
+        cursor = await self._conn.execute(
+            """SELECT d.* FROM documents d
+               INNER JOIN reading_list_items rli ON d.id = rli.document_id
+               WHERE rli.list_id = ?
+               ORDER BY rli.added_at DESC""",
+            (list_id,),
+        )
+        rows = await cursor.fetchall()
+        from storage.models import DocumentRecord
+        import json as _json
+        results = []
+        for r in rows:
+            extra_raw = r["extra"]
+            try:
+                extra = _json.loads(extra_raw) if extra_raw else {}
+            except Exception:
+                extra = {}
+            results.append(DocumentRecord(
+                id=r["id"], document_type=r["document_type"],
+                title=r["title"], authors=r["authors"], year=r["year"],
+                journal=r["journal"], doi=r["doi"],
+                keywords=r["keywords"], abstract=r["abstract"],
+                source_type=r["source_type"],
+                file_path=r["file_path"],
+                extra=extra,
+                collection=r["collection"],
+            ))
+        return results
+
+    async def rename_reading_list(self, list_id: str, new_name: str) -> bool:
+        """Rename a reading list. Returns False on empty/invalid name."""
+        new_name = (new_name or "").strip()
+        if not new_name or not list_id:
+            return False
+        await self._conn.execute(
+            "UPDATE reading_lists SET name = ? WHERE id = ?",
+            (new_name, list_id),
+        )
+        await self._conn.commit()
+        return True
+
+    async def delete_reading_list(self, list_id: str) -> None:
+        """Delete a reading list (items cascade-deleted via FK)."""
+        await self._conn.execute("DELETE FROM reading_lists WHERE id = ?", (list_id,))
+        await self._conn.commit()
+
+    # --------------------------------------------------------------------
 
     async def insert_chunks(self, chunks: list[ChunkRecord]) -> None:
         await self._conn.executemany(

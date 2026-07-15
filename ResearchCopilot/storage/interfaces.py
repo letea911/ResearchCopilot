@@ -87,6 +87,40 @@ class BaseMetadataStore(ABC):
         promotes sub-libraries to root level. Returns docs moved count."""
         ...
 
+    # ---- Reading Lists ----
+
+    @abstractmethod
+    async def create_reading_list(self, name: str, query: str = "") -> str:
+        """Create a virtual reading list. Returns the new list's UUID."""
+        ...
+
+    @abstractmethod
+    async def add_to_reading_list(self, list_id: str, document_ids: list[str]) -> int:
+        """Add documents to a reading list. Returns count added."""
+        ...
+
+    @abstractmethod
+    async def remove_from_reading_list(self, list_id: str, document_id: str) -> None:
+        ...
+
+    @abstractmethod
+    async def get_reading_lists(self) -> list[dict]:
+        ...
+
+    @abstractmethod
+    async def get_reading_list_items(self, list_id: str) -> list[DocumentRecord]:
+        ...
+
+    @abstractmethod
+    async def rename_reading_list(self, list_id: str, new_name: str) -> bool:
+        ...
+
+    @abstractmethod
+    async def delete_reading_list(self, list_id: str) -> None:
+        ...
+
+    # ----
+
     @abstractmethod
     async def insert_chunks(self, chunks: list[ChunkRecord]) -> None:
         """Insert chunk records in batch."""
