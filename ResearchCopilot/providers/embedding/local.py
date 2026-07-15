@@ -15,7 +15,15 @@ class LocalEmbeddingProvider(BaseEmbeddingProvider):
     def _load_model(self):
         if self._model is None:
             from sentence_transformers import SentenceTransformer
-            self._model = SentenceTransformer(self._config.model)
+            # Try local files first — avoids HuggingFace network check that
+            # hangs for tens of seconds on each startup behind the GFW.
+            # Falls back to allowing downloads if the model isn't cached yet.
+            try:
+                self._model = SentenceTransformer(
+                    self._config.model, local_files_only=True
+                )
+            except Exception:
+                self._model = SentenceTransformer(self._config.model)
         return self._model
 
     def _embed_sync(self, texts: list[str]) -> list[list[float]]:
