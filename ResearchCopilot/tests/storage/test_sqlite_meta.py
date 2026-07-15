@@ -204,6 +204,59 @@ async def test_rename_collection(store):
 
 
 @pytest.mark.asyncio
+async def test_create_sub_collection(store):
+    await store.create_collection("电催化")
+    await store.create_collection("高熵", parent="电催化")
+    roots = await store.list_collections()  # default: parent=None → root only
+    assert "电催化" in roots
+    assert "高熵" not in roots
+    children = await store.list_collections(parent="电催化")
+    assert "高熵" in children
+
+
+@pytest.mark.asyncio
+async def test_get_collection_tree(store):
+    await store.create_collection("A")
+    await store.create_collection("A1", parent="A")
+    await store.create_collection("A2", parent="A")
+    await store.create_collection("B")
+    tree = await store.get_collection_tree()
+    # Find A's node
+    a_node = next(n for n in tree if n["name"] == "A")
+    assert set(a_node["children"]) == {"A1", "A2"}
+    b_node = next(n for n in tree if n["name"] == "B")
+    assert b_node["children"] == []
+
+
+@pytest.mark.asyncio
+async def test_expand_collections(store):
+    await store.create_collection("电催化")
+    await store.create_collection("高熵", parent="电催化")
+    await store.create_collection("异质结构", parent="电催化")
+    expanded = await store.expand_collections(["电催化"])
+    assert set(expanded) == {"电催化", "高熵", "异质结构"}
+
+
+@pytest.mark.asyncio
+async def test_expand_collections_none(store):
+    assert await store.expand_collections(None) is None
+
+
+@pytest.mark.asyncio
+async def test_rename_parent_cascades(store):
+    await store.create_collection("OLD")
+    await store.create_collection("child", parent="OLD")
+    await store.insert_document(DocumentRecord(
+        id="rc-1", document_type="literature", title="T", collection="child"))
+    ok = await store.rename_collection("OLD", "NEW")
+    assert ok
+    children = await store.list_collections(parent="NEW")
+    assert "child" in children
+    doc = await store.get_document("rc-1")
+    assert doc.collection == "child"  # unchanged — only parent ref updated
+
+
+@pytest.mark.asyncio
 async def test_rename_collection_collision_returns_false(store):
     await store.create_collection("A")
     await store.create_collection("B")

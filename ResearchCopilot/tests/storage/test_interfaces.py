@@ -20,8 +20,10 @@ class FakeMetadataStore(BaseMetadataStore):
     async def get_document(self, document_id): return None
     async def get_document_by_doi(self, doi): return None
     async def list_documents(self, document_type=None, year=None, collection=None, limit=50): return []
-    async def list_collections(self): return []
-    async def create_collection(self, name): pass
+    async def list_collections(self, parent=None): return []
+    async def get_collection_tree(self): return []
+    async def expand_collections(self, names): return names
+    async def create_collection(self, name, parent=None): pass
     async def rename_collection(self, old_name, new_name): return True
     async def insert_chunks(self, chunks): pass
     async def get_chunks_by_document(self, document_id): return []

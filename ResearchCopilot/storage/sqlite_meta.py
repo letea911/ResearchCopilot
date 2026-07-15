@@ -41,8 +41,11 @@ class SQLiteMetadataStore(BaseMetadataStore):
 
             CREATE TABLE IF NOT EXISTS collections (
                 name TEXT PRIMARY KEY,
+                parent TEXT DEFAULT NULL,
                 created_at TEXT DEFAULT ''
             );
+
+            CREATE INDEX IF NOT EXISTS idx_collections_parent ON collections(parent);
 
             CREATE TABLE IF NOT EXISTS chunks (
                 id TEXT PRIMARY KEY,
@@ -88,14 +91,23 @@ class SQLiteMetadataStore(BaseMetadataStore):
         except Exception:
             pass  # column already exists
 
+        # Idempotent migration: add `parent` to collections table (Phase 9 — nested libs)
+        try:
+            await self._conn.execute(
+                "ALTER TABLE collections ADD COLUMN parent TEXT DEFAULT NULL"
+            )
+            await self._conn.commit()
+        except Exception:
+            pass  # column already exists
+
         # Seed the collections table: always ensure 默认库 exists, and absorb any
         # library names already present on documents (so historical data shows up).
         await self._conn.execute(
-            "INSERT OR IGNORE INTO collections (name) VALUES ('默认库')"
+            "INSERT OR IGNORE INTO collections (name, parent) VALUES ('默认库', NULL)"
         )
         await self._conn.execute(
-            """INSERT OR IGNORE INTO collections (name)
-               SELECT DISTINCT collection FROM documents
+            """INSERT OR IGNORE INTO collections (name, parent)
+               SELECT DISTINCT collection, NULL FROM documents
                WHERE collection IS NOT NULL AND collection != ''"""
         )
         await self._conn.commit()
@@ -116,9 +128,9 @@ class SQLiteMetadataStore(BaseMetadataStore):
                 doc.created_at,
             ),
         )
-        # Ensure the library exists in the collections table
+        # Ensure the library exists in the collections table (root-level by default)
         await self._conn.execute(
-            "INSERT OR IGNORE INTO collections (name) VALUES (?)",
+            "INSERT OR IGNORE INTO collections (name, parent) VALUES (?, NULL)",
             (doc.collection or "默认库",),
         )
         # Rebuild FTS index to compensate for missing content-sync triggers
@@ -171,42 +183,94 @@ class SQLiteMetadataStore(BaseMetadataStore):
         rows = await cursor.fetchall()
         return [self._row_to_document(r) for r in rows]
 
-    async def list_collections(self) -> list[str]:
-        """List all library names (including empty ones)."""
-        cursor = await self._conn.execute(
-            "SELECT name FROM collections ORDER BY name"
-        )
+    async def list_collections(self, parent: str | None = None) -> list[str]:
+        """List library names. parent=None → root only. parent=<name> → children of that parent."""
+        if parent is None:
+            cursor = await self._conn.execute(
+                "SELECT name FROM collections WHERE parent IS NULL ORDER BY name"
+            )
+        else:
+            cursor = await self._conn.execute(
+                "SELECT name FROM collections WHERE parent = ? ORDER BY name",
+                (parent,),
+            )
         rows = await cursor.fetchall()
         return [r["name"] for r in rows]
 
-    async def create_collection(self, name: str) -> None:
-        """Create a named library (idempotent)."""
+    async def get_collection_tree(self) -> list[dict]:
+        """Return full two-level hierarchy as list of dicts with 'children'."""
+        cursor = await self._conn.execute(
+            "SELECT name, parent FROM collections ORDER BY parent, name"
+        )
+        rows = await cursor.fetchall()
+        # Separate roots and children
+        children_map: dict[str, list[str]] = {}
+        roots = []
+        for r in rows:
+            name = r["name"]
+            p = r["parent"]
+            if not p:
+                roots.append(name)
+                children_map.setdefault(name, [])
+            else:
+                children_map.setdefault(p, []).append(name)
+        result = []
+        for root in roots:
+            node = {"name": root, "children": children_map.get(root, [])}
+            result.append(node)
+        return result
+
+    async def expand_collections(
+        self, names: list[str] | None
+    ) -> list[str] | None:
+        """Expand parent names to include all leaf children for retrieval.
+        Returns None if names is None (meaning 'all libraries')."""
+        if names is None:
+            return None
+        expanded = list(names)
+        for name in names:
+            cursor = await self._conn.execute(
+                "SELECT name FROM collections WHERE parent = ?", (name,)
+            )
+            children = await cursor.fetchall()
+            for c in children:
+                cname = c["name"]
+                if cname not in expanded:
+                    expanded.append(cname)
+        return expanded
+
+    async def create_collection(self, name: str, parent: str | None = None) -> None:
+        """Create a named library, optionally under a parent (max 2 levels)."""
         name = (name or "").strip()
         if not name:
             return
         await self._conn.execute(
-            "INSERT OR IGNORE INTO collections (name, created_at) VALUES (?, '')",
-            (name,),
+            "INSERT OR IGNORE INTO collections (name, parent, created_at) VALUES (?, ?, '')",
+            (name, parent),
         )
         await self._conn.commit()
 
     async def rename_collection(self, old_name: str, new_name: str) -> bool:
-        """Rename a library. Updates collections table + all documents in it.
-        Returns False if new_name already exists (collision)."""
+        """Rename a library. Updates collections table + all documents + child
+        library parent references. Returns False if new_name exists (collision)."""
         old_name = (old_name or "").strip()
         new_name = (new_name or "").strip()
         if not old_name or not new_name or old_name == new_name:
             return False
 
-        # Check for collision
         cur = await self._conn.execute(
             "SELECT 1 FROM collections WHERE name = ?", (new_name,)
         )
         if await cur.fetchone():
-            return False  # target name already taken
+            return False
 
         await self._conn.execute(
             "UPDATE OR REPLACE collections SET name = ? WHERE name = ?",
+            (new_name, old_name),
+        )
+        # Cascade: children that pointed to old_name
+        await self._conn.execute(
+            "UPDATE collections SET parent = ? WHERE parent = ?",
             (new_name, old_name),
         )
         await self._conn.execute(

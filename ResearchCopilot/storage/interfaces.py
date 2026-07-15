@@ -57,18 +57,28 @@ class BaseMetadataStore(ABC):
         ...
 
     @abstractmethod
-    async def list_collections(self) -> list[str]:
-        """List all library (collection) names, including empty ones."""
+    async def list_collections(self, parent: str | None = None) -> list[str]:
+        """List library names. parent=None → root only; parent=name → children."""
         ...
 
     @abstractmethod
-    async def create_collection(self, name: str) -> None:
-        """Create a named library (idempotent)."""
+    async def get_collection_tree(self) -> list[dict]:
+        """Return full two-level hierarchy [{"name":...,"children":[...]}]. """
+        ...
+
+    @abstractmethod
+    async def expand_collections(self, names: list[str] | None) -> list[str] | None:
+        """Expand parent names to include all leaf children. None → None (all)."""
+        ...
+
+    @abstractmethod
+    async def create_collection(self, name: str, parent: str | None = None) -> None:
+        """Create a named library, optionally under a parent."""
         ...
 
     @abstractmethod
     async def rename_collection(self, old_name: str, new_name: str) -> bool:
-        """Rename a library. Returns False if target name exists."""
+        """Rename a library. Cascades parent refs and document collections."""
         ...
 
     @abstractmethod
