@@ -11,35 +11,71 @@ from storage.interfaces import BaseMetadataStore
 
 CLASSIFY_SYSTEM = (
     "You are a scientific paper classifier specializing in computational "
-    "chemistry, materials science, and catalysis. Analyze the paper and "
-    "return ONLY valid JSON, no other text."
+    "chemistry, materials science, and catalysis. You work in TWO STEPS:\n"
+    "STEP 1 — Read the paper and identify its core research topics. "
+    "Extract precise keywords and write a concise abstract.\n"
+    "STEP 2 — Compare those keywords against the available library names. "
+    "The best library is the one whose NAME best matches the paper's "
+    "research TOPIC, MATERIAL SYSTEM, or METHOD. Think about semantic "
+    "similarity: '电催化' matches electrocatalysis/OER/HER/ORR papers; "
+    "'高熵' matches high-entropy alloy/oxide papers; 'DFT' matches "
+    "density functional theory / first-principles papers.\n"
+    "Always return ONLY valid JSON, no other text."
 )
 
-CLASSIFY_USER_TEMPLATE = """Paper title: {title}
-Authors: {authors}
-Library hierarchy (parent → sub-library). Choose the MOST SPECIFIC match:
-{collections}
+CLASSIFY_USER_TEMPLATE = """TASK: Classify this paper by first understanding it, then matching to libraries.
 
-Full text:
+=== PAPER INFO ===
+Title: {title}
+Authors: {authors}
+
+=== FULL TEXT ===
 {chunks_text}
 
-Return a JSON object with these keys:
-- "keywords": list of 3-5 relevant scientific keywords (e.g. ["oxygen evolution reaction", "LDH", "density functional theory"])
-- "abstract": concise 2-3 sentence summary of what this paper studied and found
-- "suggested_parent": best-matching root library name, or "" if none fit
-- "suggested_collection": best-matching sub-library name (under the parent above), or "" if none fit
-- "new_parent": suggested new root library name if no existing parent fits, or ""
-- "new_collection": suggested new sub-library name, or ""
-- "confidence": number between 0.0 and 1.0 — your certainty in the suggested placement
+=== AVAILABLE LIBRARIES ===
+(specific libraries first — pick from these whenever possible)
+{collections}
 
-Classification rules (READ CAREFULLY):
-1. The user has created SPECIFIC libraries for their research topics. You MUST match every paper to the BEST specific library.
-2. Libraries marked "⚠ LAST RESORT" are CATCH-ALL bins. Using them means you FAILED to classify. Only use them if the paper is completely unrelated to ALL specific libraries.
-3. For a computational chemistry / materials science paper, prefer the closest matching specific library. Match by: research topic, material system, method, application.
-4. If no specific sub-library matches but a parent library's theme fits, suggest a NEW sub-library (new_collection) under that parent.
-5. Only suggest a new parent (new_parent) if the paper's topic is entirely unrepresented.
-6. Set confidence HIGH (0.7-1.0) for specific matches, LOW (0.3 or below) if you fall back to a generic library.
-7. Leave new_* fields empty when existing libraries already cover this paper's topic."""
+=== STEP-BY-STEP INSTRUCTIONS ===
+
+STEP 1 — UNDERSTAND THE PAPER
+Read the full text. Identify:
+- What is the MAIN research topic? (e.g. OER electrocatalysis, DFT calculations, catalyst synthesis)
+- What MATERIAL SYSTEM is studied? (e.g. LDH, high-entropy oxides, perovskites, MOFs)
+- What METHOD is used? (e.g. experiment, DFT, machine learning, EXAFS)
+
+Based on your understanding, determine:
+- "keywords": 4-6 precise keywords that capture the paper's topic, material, method
+- "abstract": 2-3 sentence summary of what was studied and found
+
+STEP 2 — MATCH KEYWORDS TO LIBRARIES
+Look at the AVAILABLE LIBRARIES above. Compare your keywords to each library name:
+- "电催化" ← matches papers about electrocatalysis, OER, HER, ORR, fuel cells, electrolysis
+- "高熵" ← matches papers about high-entropy alloys/oxides/nitrides
+- "DFT" ← matches papers using density functional theory, first-principles, VASP
+- "原位" / "in-situ" ← matches papers about in-situ/operando characterization
+- "合成" ← matches papers about material synthesis methods
+
+Which library name has the STRONGEST semantic overlap with your keywords? That's your recommendation.
+
+STEP 3 — OUTPUT JSON
+Return ONLY this JSON (no other text):
+{{
+  "keywords": ["keyword1", "keyword2", ...],
+  "abstract": "2-3 sentence summary...",
+  "suggested_parent": "best-matching root library name, or empty string",
+  "suggested_collection": "best-matching sub-library name, or empty string",
+  "new_parent": "suggested new root library ONLY if no existing one fits, else empty string",
+  "new_collection": "suggested new sub-library ONLY if needed, else empty string",
+  "confidence": 0.0-1.0
+}}
+
+CRITICAL RULES:
+- The keywords you extract in Step 1 MUST drive your library choice in Step 2.
+- If your keywords are ["oxygen evolution reaction", "LDH", "electrocatalysis"], the library should be related to 电催化 or OER, NOT 临时库.
+- Libraries marked ⚠ are LAST RESORT. Using them means no specific library matched your keywords.
+- Set confidence based on keyword-library overlap: strong overlap → 0.8+, weak → 0.4-0.6, forced generic → ≤0.3.
+- Only suggest new libraries (new_parent/new_collection) if the paper's topic has ZERO overlap with ALL existing libraries."""
 
 
 
