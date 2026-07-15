@@ -3,20 +3,28 @@ import html
 import asyncio
 
 from PyQt5.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QTextBrowser, QLineEdit, QPushButton
+    QWidget, QVBoxLayout, QHBoxLayout, QTextBrowser, QLineEdit, QPushButton,
+    QInputDialog,
 )
 from PyQt5.QtGui import QDesktopServices, QTextCursor
-from PyQt5.QtCore import QUrl
+from PyQt5.QtCore import QUrl, pyqtSignal
 
 from models.message import ChatMessage, Role
 
 
 class ChatPanel(QWidget):
+    # (name, list_of_doc_ids) — emitted when user wants to export citations
+    export_to_list_requested = pyqtSignal(str, list)
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.ctx = None
         self.history: list[ChatMessage] = []
         self._collections_provider = None  # callable -> list[str] | None
+
+        # Citation export tracking — per-question selection state
+        self._export_citations: list[dict] = []   # [{doc_id, title, file_path}]
+        self._export_selected: set = set()         # indices selected
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(8, 8, 8, 8)
@@ -42,6 +50,13 @@ class ChatPanel(QWidget):
 
         layout.addLayout(input_row)
 
+        # Export row — appears after citations
+        self.export_btn = QPushButton("📂 导出勾选的 0 篇为分组")
+        self.export_btn.setEnabled(False)
+        self.export_btn.clicked.connect(self._on_export_clicked)
+        self.export_btn.setVisible(False)
+        layout.addWidget(self.export_btn)
+
         # Disabled until the context is ready.
         self.set_input_enabled(False)
 
@@ -50,8 +65,19 @@ class ChatPanel(QWidget):
         self.send_btn.setEnabled(enabled)
 
     def _on_link_clicked(self, url: QUrl) -> None:
-        """打开引用链接：用系统默认程序在外部打开（PDF 用系统阅读器）。"""
-        QDesktopServices.openUrl(url)
+        """Handle custom anchor clicks: file:// → open PDF, select:/deselect: → toggle export."""
+        scheme = url.scheme()
+        if scheme == "file":
+            QDesktopServices.openUrl(url)
+        elif scheme == "select":
+            idx = int(url.host()) if url.host() else -1
+            if 0 <= idx < len(self._export_citations):
+                self._export_selected.add(idx)
+                self._refresh_export_html()
+        elif scheme == "deselect":
+            idx = int(url.host()) if url.host() else -1
+            self._export_selected.discard(idx)
+            self._refresh_export_html()
 
     def set_context(self, ctx: dict) -> None:
         self.ctx = ctx
@@ -97,9 +123,21 @@ class ChatPanel(QWidget):
         answer_html = html.escape(result.answer).replace("\n", "<br>")
         self.browser.append(f"<b>助手：</b> {answer_html}")
 
+        # Reset export state for new answer
+        self._export_citations.clear()
+        self._export_selected.clear()
+
         if result.citations:
             self.browser.append("<b>参考文献：</b>")
             for i, c in enumerate(result.citations, start=1):
+                # Store for export
+                self._export_citations.append({
+                    "doc_id": c.doc_id if hasattr(c, "doc_id") and c.doc_id else "",
+                    "title": c.title or "Unknown",
+                    "file_path": c.file_path or "",
+                })
+                idx = i - 1
+
                 line = f"[{i}] {html.escape(c.title or 'Unknown')}"
                 extras = []
                 if c.section:
@@ -111,8 +149,75 @@ class ChatPanel(QWidget):
                 if c.file_path:
                     url = "file:///" + str(c.file_path).replace("\\", "/")
                     line += f'  <a href="{url}">📄 打开PDF</a>'
+                # Toggle link for export selection
+                line += (
+                    f'  <a href="select:{idx}" style="color:#888; '
+                    f'text-decoration:none;">☐ 标记导出</a>'
+                )
                 self.browser.append(line)
+        self._update_export_btn()
         self._scroll_to_bottom()
+
+    def _refresh_export_html(self) -> None:
+        """Rewrite citation toggle links to reflect current selection state."""
+        cursor = self.browser.textCursor()
+        cursor.movePosition(QTextCursor.Start)
+        # Gather all HTML, replace select:/deselect: markers, restore
+        html_text = self.browser.toHtml()
+        for i in range(len(self._export_citations)):
+            selected = i in self._export_selected
+            if selected:
+                html_text = html_text.replace(
+                    f'href="select:{i}"',
+                    f'href="deselect:{i}"',
+                )
+                html_text = html_text.replace(
+                    f'>☐ 标记导出</a>',
+                    f'>☑ 已选</a>',
+                )
+            else:
+                html_text = html_text.replace(
+                    f'href="deselect:{i}"',
+                    f'href="select:{i}"',
+                )
+                html_text = html_text.replace(
+                    f'>☑ 已选</a>',
+                    f'>☐ 标记导出</a>',
+                )
+        self.browser.setHtml(html_text)
+        self._update_export_btn()
+
+    def _update_export_btn(self) -> None:
+        n = len(self._export_selected)
+        if n > 0:
+            self.export_btn.setText(f"📂 导出勾选的 {n} 篇为分组")
+            self.export_btn.setEnabled(True)
+            self.export_btn.setVisible(True)
+        elif self._export_citations:
+            self.export_btn.setText("📂 导出勾选的 0 篇为分组")
+            self.export_btn.setEnabled(False)
+            self.export_btn.setVisible(True)
+        else:
+            self.export_btn.setVisible(False)
+
+    def _on_export_clicked(self) -> None:
+        if not self._export_selected or self.ctx is None:
+            return
+        name, ok = QInputDialog.getText(
+            self, "导出为分组", "新分组名称："
+        )
+        name = (name or "").strip()
+        if not ok or not name:
+            return
+        doc_ids = [
+            self._export_citations[i]["doc_id"]
+            for i in sorted(self._export_selected)
+            if self._export_citations[i].get("doc_id")
+        ]
+        if doc_ids:
+            self.export_to_list_requested.emit(name, doc_ids)
+            self.export_btn.setText("✅ 已导出")
+            self.export_btn.setEnabled(False)
 
     async def _ask(self, question: str) -> None:
         self.set_input_enabled(False)
