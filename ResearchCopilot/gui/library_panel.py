@@ -124,18 +124,45 @@ class LibraryPanel(QWidget):
         if item is None or self.ctx is None:
             return
 
-        lib_name = item.data(0, Qt.UserRole + 1)  # library name if this is a lib node
+        lib_name = item.data(0, Qt.UserRole + 1)  # library name (or reading list name)
         doc_id = item.data(0, Qt.UserRole)          # doc_id if this is a document node
+        list_id = item.data(0, Qt.UserRole + 2)     # reading_list id if applicable
+        is_rl_header = list_id == "__reading_list_header__"
 
         if doc_id:
-            return  # no context menu for documents
-
-        if not lib_name:
+            # Document node — check if it's in a reading list
+            if list_id and not is_rl_header:
+                menu = QMenu(self)
+                pdf_action = menu.addAction("📄 跳转PDF")
+                remove_action = menu.addAction("从清单移除")
+                action = menu.exec_(self.tree.viewport().mapToGlobal(pos))
+                if action == pdf_action:
+                    self._open_doc_pdf(doc_id)
+                elif action == remove_action:
+                    import asyncio
+                    asyncio.ensure_future(self._do_remove_from_list(list_id, doc_id))
             return
 
+        if not lib_name or is_rl_header:
+            return
+
+        # Is this a reading list or a regular library?
+        if list_id:
+            # Reading list node
+            menu = QMenu(self)
+            rename_action = menu.addAction("重命名")
+            delete_action = menu.addAction("删除清单")
+            action = menu.exec_(self.tree.viewport().mapToGlobal(pos))
+            if action == rename_action:
+                self._rename_library(item)
+            elif action == delete_action:
+                self._on_delete_reading_list(list_id, lib_name)
+            return
+
+        # Regular library node
         menu = QMenu(self)
 
-        # Determine if this is a root library (parent is invisible root or None)
+        # Determine if this is a root library
         parent = item.parent()
         is_root = parent is None or parent is self.tree.invisibleRootItem()
 
@@ -199,6 +226,39 @@ class LibraryPanel(QWidget):
                 pass
         await self.refresh()
 
+    # ---- Reading list actions ----------------------------------------------
+
+    def _on_delete_reading_list(self, list_id: str, name: str) -> None:
+        reply = QMessageBox.question(
+            self, "确认删除", f"删除阅读清单「{name}」？\n\n清单中的文献不会被删除。",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+        )
+        if reply != QMessageBox.Yes:
+            return
+        import asyncio
+        asyncio.ensure_future(self._do_delete_list(list_id))
+
+    async def _do_delete_list(self, list_id: str) -> None:
+        await self.ctx["meta_store"].delete_reading_list(list_id)
+        await self.refresh()
+
+    async def _do_remove_from_list(self, list_id: str, doc_id: str) -> None:
+        await self.ctx["meta_store"].remove_from_reading_list(list_id, doc_id)
+        await self.refresh()
+
+    def _open_doc_pdf(self, doc_id: str) -> None:
+        """Fetch document by ID and open its PDF with system viewer."""
+        import asyncio
+        asyncio.ensure_future(self._do_open_pdf(doc_id))
+
+    async def _do_open_pdf(self, doc_id: str) -> None:
+        doc = await self.ctx["meta_store"].get_document(doc_id)
+        if doc and doc.file_path:
+            from PyQt5.QtGui import QDesktopServices
+            from PyQt5.QtCore import QUrl
+            url = "file:///" + str(doc.file_path).replace("\\", "/")
+            QDesktopServices.openUrl(QUrl(url))
+
     async def _create_and_refresh(self, name: str, parent: str | None) -> None:
         await self.ctx["meta_store"].create_collection(name, parent=parent)
         await self.refresh()
@@ -230,28 +290,33 @@ class LibraryPanel(QWidget):
         old_name = item.data(0, Qt.UserRole + 1)
         if not old_name:
             return
+        list_id = item.data(0, Qt.UserRole + 2)
+        title = "重命名阅读清单" if list_id else "重命名文献库"
         new_name, ok = QInputDialog.getText(
-            self, "重命名文献库", "新名称：", text=old_name
+            self, title, "新名称：", text=old_name
         )
         new_name = (new_name or "").strip()
         if not ok or not new_name or new_name == old_name:
             return
         import asyncio
-        asyncio.ensure_future(self._do_rename(old_name, new_name))
+        asyncio.ensure_future(self._do_rename(old_name, new_name, list_id))
 
-    async def _do_rename(self, old_name: str, new_name: str) -> None:
+    async def _do_rename(self, old_name: str, new_name: str, list_id: str | None = None) -> None:
         meta = self.ctx["meta_store"]
-        vec = self.ctx["vector_store"]
-        ok = await meta.rename_collection(old_name, new_name)
-        if not ok:
-            return
-        try:
-            await vec.update_metadata_by_filter(
-                where={"collection": old_name},
-                updates={"collection": new_name},
-            )
-        except Exception:
-            pass
+        if list_id:
+            await meta.rename_reading_list(list_id, new_name)
+        else:
+            vec = self.ctx["vector_store"]
+            ok = await meta.rename_collection(old_name, new_name)
+            if not ok:
+                return
+            try:
+                await vec.update_metadata_by_filter(
+                    where={"collection": old_name},
+                    updates={"collection": new_name},
+                )
+            except Exception:
+                pass
         await self.refresh()
 
     # ---- Checkbox propagation -----------------------------------------------
@@ -390,6 +455,39 @@ class LibraryPanel(QWidget):
                 root_item.setData(0, Qt.UserRole + 1, root_name)
                 root_item.setToolTip(0, f"「{root_name}」\n（双击可重命名）")
                 root_item.setExpanded(True)
+
+            # ---- Reading Lists (virtual groups) ----
+            reading_lists = await meta.get_reading_lists()
+            if reading_lists:
+                # Section header
+                rl_header = QTreeWidgetItem(self.tree)
+                rl_header.setText(0, f"📋 阅读清单  ({len(reading_lists)})")
+                rl_header.setFlags(rl_header.flags() & ~Qt.ItemIsUserCheckable)
+                rl_header.setData(0, Qt.UserRole + 2, "__reading_list_header__")
+                rl_header.setExpanded(True)
+
+                for rl in reading_lists:
+                    rl_item = QTreeWidgetItem(rl_header)
+                    rl_item.setText(0, f"{rl['name']}  ({rl.get('doc_count', 0)}篇)")
+                    rl_item.setFlags(rl_item.flags() & ~Qt.ItemIsUserCheckable)
+                    rl_item.setData(0, Qt.UserRole + 2, rl["id"])  # list_id
+                    rl_item.setData(0, Qt.UserRole + 1, rl["name"])  # for rename
+                    rl_item.setToolTip(0, f"阅读清单：{rl['name']}\n右键可重命名或删除")
+
+                    # Show documents in this list
+                    rl_docs = await meta.get_reading_list_items(rl["id"])
+                    total_docs += len(rl_docs)
+                    for doc in rl_docs:
+                        d_title = doc.title or "（无标题）"
+                        year = doc.year if doc.year is not None else "—"
+                        child = QTreeWidgetItem(rl_item)
+                        child.setText(0, f"{d_title[:38]}  ({year})")
+                        child.setToolTip(
+                            0,
+                            f"{d_title}\n{doc.authors or ''}\n（双击可总结这篇，右键跳转PDF）",
+                        )
+                        child.setData(0, Qt.UserRole, doc.id)
+                        child.setData(0, Qt.UserRole + 2, rl["id"])  # parent list
 
             # Repopulate import target combo
             self.target_combo.blockSignals(True)
