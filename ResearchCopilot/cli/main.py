@@ -376,13 +376,23 @@ def list_collections_cmd():
     meta = ctx["meta_store"]
 
     async def _run():
-        names = await meta.list_collections()
-        if not names:
+        tree = await meta.get_collection_tree()
+        if not tree:
             console.print("[yellow]No libraries yet.[/yellow]")
             return
-        for name in names:
-            docs = await meta.list_documents(collection=name, limit=100000)
-            console.print(f"  [cyan]{name}[/cyan] — {len(docs)} 篇")
+        total = 0
+        for node in tree:
+            if node["children"]:
+                console.print(f"  [cyan]{node['name']}[/cyan]")
+                for child in node["children"]:
+                    docs = await meta.list_documents(collection=child, limit=100000)
+                    console.print(f"    {child} — {len(docs)} 篇")
+                    total += len(docs)
+            else:
+                docs = await meta.list_documents(collection=node["name"], limit=100000)
+                console.print(f"  [cyan]{node['name']}[/cyan] — {len(docs)} 篇")
+                total += len(docs)
+        console.print(f"[dim]{total} total[/dim]")
 
     asyncio.run(_run())
 

@@ -83,7 +83,14 @@ class ClassifierDialog(QDialog):
     # ---- Async init ---------------------------------------------------------
 
     async def _init_collections(self):
-        names = await self.ctx["meta_store"].list_collections()
+        tree = await self.ctx["meta_store"].get_collection_tree()
+        names = []
+        for node in tree:
+            if node["children"]:
+                for child in node["children"]:
+                    names.append(f"{node['name']} → {child}")
+            else:
+                names.append(node["name"])
         if not names:
             names = ["默认库"]
         self.scope_combo.addItems(names)
@@ -111,9 +118,11 @@ class ClassifierDialog(QDialog):
         if self.radio_sel.isChecked():
             ids = self._library_panel.get_selected_doc_ids()
             return ids or []
-        collection = self.scope_combo.currentText()
-        if not collection:
+        coll_raw = self.scope_combo.currentText()
+        if not coll_raw:
             return []
+        # "电催化 → 高熵" → leaf name only
+        collection = coll_raw.split("→")[-1].strip() if "→" in coll_raw else coll_raw
         docs = await self.ctx["meta_store"].list_documents(
             collection=collection, limit=100000
         )

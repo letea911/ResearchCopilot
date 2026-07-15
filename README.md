@@ -31,6 +31,17 @@ C:/ProgramData/anaconda3/python.exe -m cli.main ask "你的问题"
 
 ## 📋 每日开发日志 (Daily Dev Log)
 
+### 2026-07-15 (Phase 9)
+- **今日目标**: Phase 9 库嵌套（两级父子引用）
+- **完成事项**:
+  - ✅ **Phase 1 存储**：collections 表加 parent 列（幂等迁移）+ `create_collection(name,parent)`/`list_collections(parent)`/`get_collection_tree()`/`expand_collections(names)`/`rename_collection` 级联 parent
+  - ✅ **Phase 2 检索**：hybrid.search 接入 `expand_collections`（父库勾选→自动展开子库）+ meta_store 注入
+  - ✅ **Phase 3 分类器**：prompt 两级推荐（suggested_parent/sub + new_parent/sub）+ ClassifyResult 扩展
+  - ✅ **Phase 4 GUI 库面板**：QTreeWidget 三层树 + 勾选联动（父勾=全子勾，半勾支持）+ 新建库 parent 下拉 + 导入下拉嵌套「→」格式
+  - ✅ **Phase 5 GUI 分类器**：弹窗目标库下拉嵌套显示 + 保存解析「父→子」
+  - ✅ **验证**：storage 45 + services 14 + CLI 10 = 69/69 PASS
+- **明日计划**: 用户亲测嵌套库；后续 Experiments 实验数据模块
+
 ### 2026-07-15 (Phase 8)
 - **今日目标**: Phase 8 AI 分类器（自动提取关键词+摘要+推荐分组）
 - **完成事项**:
