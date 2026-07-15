@@ -32,13 +32,15 @@ Return a JSON object with these keys:
 - "new_collection": suggested new sub-library name, or ""
 - "confidence": number between 0.0 and 1.0 — your certainty in the suggested placement
 
-Classification rules (MOST IMPORTANT):
-1. ALWAYS prefer the most SPECIFIC existing sub-library over generic ones. A paper about high-entropy LDH for OER should go to "电催化 → OER" or "电催化 → 高熵", NOT "默认库" or "临时库".
-2. NEVER place a paper in a generic catch-all library like "默认库" or "临时库" unless it genuinely doesn't fit ANY specific library. These are LAST RESORT.
-3. Match by scientific topic, method, and material system — not just by keywords in the title.
-4. If the paper fits an existing parent's theme but its specific sub-topic is missing, suggest a new sub-library (new_collection) under that parent.
-5. Only suggest a new parent (new_parent) if the paper's topic is completely unrepresented.
-6. Leave new_* fields empty when existing libraries already cover this paper's topic."""
+Classification rules (READ CAREFULLY):
+1. The user has created SPECIFIC libraries for their research topics. You MUST match every paper to the BEST specific library.
+2. Libraries marked "⚠ LAST RESORT" are CATCH-ALL bins. Using them means you FAILED to classify. Only use them if the paper is completely unrelated to ALL specific libraries.
+3. For a computational chemistry / materials science paper, prefer the closest matching specific library. Match by: research topic, material system, method, application.
+4. If no specific sub-library matches but a parent library's theme fits, suggest a NEW sub-library (new_collection) under that parent.
+5. Only suggest a new parent (new_parent) if the paper's topic is entirely unrepresented.
+6. Set confidence HIGH (0.7-1.0) for specific matches, LOW (0.3 or below) if you fall back to a generic library.
+7. Leave new_* fields empty when existing libraries already cover this paper's topic."""
+
 
 
 class ClassifierService(BaseClassifierService):
@@ -68,15 +70,26 @@ class ClassifierService(BaseClassifierService):
             chunks_text = chunks_text[:6000]
 
         tree = await self._meta_store.get_collection_tree()
-        # Format hierarchy for the prompt: "电催化 → 高熵\n电催化 → OER\n默认库"
-        lines = []
+        # Format hierarchy for the prompt.
+        # Mark generic libraries so the LLM treats them as LAST RESORT.
+        GENERIC = {"默认库", "临时库", "general", "default", "temp", "临时", "默认"}
+        specific = []
+        generic = []
         for node in tree:
-            if node["children"]:
-                for child in node["children"]:
-                    lines.append(f"  {node['name']} → {child}")
-            else:
-                lines.append(f"  {node['name']}")
-        collections_display = "\n".join(lines) if lines else "  默认库"
+            is_generic_root = node["name"] in GENERIC
+            for child in node.get("children", []):
+                if is_generic_root or child in GENERIC:
+                    generic.append(f"  {node['name']} → {child}  ⚠ LAST RESORT")
+                else:
+                    specific.append(f"  {node['name']} → {child}")
+            if not node["children"]:
+                if is_generic_root:
+                    generic.append(f"  {node['name']}  ⚠ LAST RESORT — avoid if possible")
+                else:
+                    specific.append(f"  {node['name']}")
+        # Specific libraries first, then generic ones at the bottom
+        all_lines = specific + generic
+        collections_display = "\n".join(all_lines) if all_lines else "  默认库  ⚠ LAST RESORT — avoid if possible"
 
         prompt = CLASSIFY_USER_TEMPLATE.format(
             title=doc.title or "Unknown",

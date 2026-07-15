@@ -84,13 +84,24 @@ class ClassifierDialog(QDialog):
 
     async def _init_collections(self):
         tree = await self.ctx["meta_store"].get_collection_tree()
-        names = []
+        GENERIC = {"默认库", "临时库", "general", "default", "temp", "临时", "默认"}
+        specific = []
+        generic = []
         for node in tree:
+            is_generic_root = node["name"] in GENERIC
             if node["children"]:
                 for child in node["children"]:
-                    names.append(f"{node['name']} → {child}")
+                    entry = f"{node['name']} → {child}"
+                    if is_generic_root or child in GENERIC:
+                        generic.append(entry)
+                    else:
+                        specific.append(entry)
             else:
-                names.append(node["name"])
+                if is_generic_root:
+                    generic.append(node["name"])
+                else:
+                    specific.append(node["name"])
+        names = specific + generic
         if not names:
             names = ["默认库"]
         self.scope_combo.addItems(names)
@@ -141,14 +152,26 @@ class ClassifierDialog(QDialog):
 
         total = len(doc_ids)
         tree_data = await meta.get_collection_tree()
-        # Build flat display list: "根库 → 子库" for nested, "根库" for root-only
-        display_names = []
+        # Build flat display list: specific libraries first, generic ones last.
+        GENERIC = {"默认库", "临时库", "general", "default", "temp", "临时", "默认"}
+        specific_names = []
+        generic_names = []
         for node in tree_data:
+            is_generic_root = node["name"] in GENERIC
             if node["children"]:
                 for child in node["children"]:
-                    display_names.append(f"{node['name']} → {child}")
+                    entry = f"{node['name']} → {child}"
+                    if is_generic_root or child in GENERIC:
+                        generic_names.append(entry)
+                    else:
+                        specific_names.append(entry)
             else:
-                display_names.append(node["name"])
+                if is_generic_root:
+                    generic_names.append(node["name"])
+                else:
+                    specific_names.append(node["name"])
+        # Specific first, then generic last. Placeholder at index 0.
+        display_names = ["⚠ 请手动选择…"] + specific_names + generic_names
 
         for i, doc_id in enumerate(doc_ids):
             self.status_label.setText(f"正在分析 {i+1}/{total}…")
@@ -235,6 +258,11 @@ class ClassifierDialog(QDialog):
                 keywords = (kw_item.text() or "").strip() if kw_item else ""
                 abstract = (abs_item.text() or "").strip() if abs_item else ""
                 collection = combo.currentText() if combo else ""
+
+                # Skip rows where user hasn't selected a real library
+                if not collection or collection.startswith("⚠"):
+                    fail += 1
+                    continue
 
                 # Parse "＋新建「父 → 子」" or "＋新建「name」" or "电催化 → 高熵"
                 parent = None
