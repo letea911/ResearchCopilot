@@ -224,8 +224,10 @@ class SQLiteMetadataStore(BaseMetadataStore):
         return self._row_to_chunk(row)
 
     async def update_document_metadata(
-        self, document_id, authors=None, year=None, journal=None, doi=None
+        self, document_id, authors=None, year=None, journal=None, doi=None,
+        keywords=None, abstract=None, collection=None,
     ) -> None:
+        needs_fts_rebuild = False
         sets, params = [], []
         if authors is not None:
             sets.append("authors = ?"); params.append(authors)
@@ -235,12 +237,24 @@ class SQLiteMetadataStore(BaseMetadataStore):
             sets.append("journal = ?"); params.append(journal)
         if doi is not None:
             sets.append("doi = ?"); params.append(doi)
+        if keywords is not None:
+            sets.append("keywords = ?"); params.append(keywords)
+            needs_fts_rebuild = True
+        if abstract is not None:
+            sets.append("abstract = ?"); params.append(abstract)
+            needs_fts_rebuild = True
+        if collection is not None:
+            sets.append("collection = ?"); params.append(collection)
         if not sets:
             return
         params.append(document_id)
         await self._conn.execute(
             f"UPDATE documents SET {', '.join(sets)} WHERE id = ?", params
         )
+        if needs_fts_rebuild:
+            await self._conn.execute(
+                "INSERT INTO documents_fts(documents_fts) VALUES('rebuild')"
+            )
         await self._conn.commit()
 
     def _row_to_document(self, row) -> DocumentRecord:

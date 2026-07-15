@@ -88,6 +88,9 @@ class BaseMetadataStore(ABC):
         year: int | None = None,
         journal: str | None = None,
         doi: str | None = None,
+        keywords: str | None = None,
+        abstract: str | None = None,
+        collection: str | None = None,
     ) -> None:
         """Update only the provided (non-None) metadata fields of a document."""
         ...

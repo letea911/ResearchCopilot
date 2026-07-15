@@ -188,3 +188,26 @@ async def test_insert_document_registers_collection(store):
         id="auto-lib", document_type="literature", title="Auto",
         collection="高熵"))
     assert "高熵" in await store.list_collections()
+
+
+@pytest.mark.asyncio
+async def test_update_metadata_keywords_abstract_collection(store):
+    await store.insert_document(DocumentRecord(
+        id="upd-1", document_type="literature", title="Update test",
+        keywords="old", abstract=None, collection="默认库"))
+    # Update all three new fields
+    await store.update_document_metadata(
+        "upd-1", keywords="DFT, catalysis", abstract="A study of...",
+        collection="LDH"
+    )
+    doc = await store.get_document("upd-1")
+    assert doc.keywords == "DFT, catalysis"
+    assert doc.abstract == "A study of..."
+    assert doc.collection == "LDH"
+
+    # Partial update: only keywords
+    await store.update_document_metadata("upd-1", keywords="OER only")
+    doc = await store.get_document("upd-1")
+    assert doc.keywords == "OER only"
+    assert doc.abstract == "A study of..."   # unchanged
+    assert doc.collection == "LDH"            # unchanged
