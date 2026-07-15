@@ -59,20 +59,25 @@ class MainWindow(QMainWindow):
 
     async def _startup(self) -> None:
         loop = asyncio.get_event_loop()
-        # build_context() is sync + slow (model construction) → run off the UI thread.
+        # build_context() is sync construction → run off UI thread
         ctx = await loop.run_in_executor(None, build_context)
         await initialize_stores(ctx)
 
-        # Warm up the embedder so the sentence-transformers model loads off the
-        # UI thread (first embed can take tens of seconds).
-        try:
-            await ctx["embedder"].embed(["warmup"])
-        except Exception:
-            pass
+        # Warm up the embedder in the background — don't block the UI.
+        # The model loads off-thread (run_in_executor), so it won't freeze the
+        # window, but waiting for it delays the "就绪" state. We fire-and-forget
+        # here so the user can start browsing immediately; the first query will
+        # be slightly slower if warmup hasn't finished yet.
+        async def _warmup():
+            try:
+                await ctx["embedder"].embed(["warmup"])
+            except Exception:
+                pass
+
+        self._warmup_task = asyncio.ensure_future(_warmup())
 
         self.ctx = ctx
         self.chat_panel.set_context(ctx)
-        # 让聊天区发问时能拿到当前勾选的库（检索范围）
         self.chat_panel.set_collections_provider(self.library_panel.selected_collections)
         self.library_panel.set_context(ctx)
         await self.library_panel.refresh(ctx)
@@ -82,7 +87,7 @@ class MainWindow(QMainWindow):
             count = await ctx["vector_store"].count()
         except Exception:
             count = 0
-        self.set_status(f"就绪 · {len(docs)}篇文献 {count}向量")
+        self.set_status(f"就绪 · {len(docs)}篇文献 {count}向量（模型后台加载中）")
 
     # ---- Drag & drop ingest -------------------------------------------------
 
