@@ -11,6 +11,8 @@ class LibraryPanel(QWidget):
     summarize_requested = pyqtSignal(str, str)
     # 「导入PDF…」选好文件 → (目标库, 文件路径列表)
     import_requested = pyqtSignal(str, list)
+    # 「AI 分类器」按钮被点击
+    classify_requested = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -38,6 +40,9 @@ class LibraryPanel(QWidget):
         self.import_btn = QPushButton("导入PDF…")
         self.import_btn.clicked.connect(self._on_import_clicked)
         btn_row.addWidget(self.import_btn)
+        self.classify_btn = QPushButton("AI 分类器")
+        self.classify_btn.clicked.connect(self.classify_requested.emit)
+        btn_row.addWidget(self.classify_btn)
         layout.addLayout(btn_row)
 
         # 库树：顶层=库（可勾选），子节点=文献
@@ -103,6 +108,15 @@ class LibraryPanel(QWidget):
         )
         if paths:
             self.import_requested.emit(self.target_collection(), list(paths))
+
+    def get_selected_doc_ids(self) -> list[str]:
+        """Return doc_ids currently selected (highlighted) in the tree."""
+        ids = []
+        for item in self.tree.selectedItems():
+            did = item.data(0, Qt.UserRole)
+            if did:
+                ids.append(did)
+        return ids
 
     def _on_item_double_clicked(self, item: QTreeWidgetItem, _column: int) -> None:
         doc_id = item.data(0, Qt.UserRole)

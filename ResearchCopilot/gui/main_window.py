@@ -47,6 +47,8 @@ class MainWindow(QMainWindow):
         self.library_panel.summarize_requested.connect(self.chat_panel.request_summary)
         # 「导入PDF…」选好文件 → 导入到目标库
         self.library_panel.import_requested.connect(self._on_import_requested)
+        # 「AI 分类器」按钮 → 打开分类对话框
+        self.library_panel.classify_requested.connect(self._on_classify_requested)
 
         self.setCentralWidget(central)
 
@@ -112,6 +114,17 @@ class MainWindow(QMainWindow):
         for path in paths:
             if str(path).lower().endswith(".pdf"):
                 asyncio.ensure_future(self._ingest_file(path, collection))
+
+    def _on_classify_requested(self):
+        """Open the AI classifier dialog."""
+        if self.ctx is None:
+            self.set_status("还在加载模型，请稍候")
+            return
+        from gui.classifier_dialog import ClassifierDialog
+        dlg = ClassifierDialog(self.ctx, self.library_panel, self)
+        dlg.exec_()
+        if dlg.was_saved():
+            asyncio.ensure_future(self.library_panel.refresh(self.ctx))
 
     async def _ingest_file(self, path: str, collection: str = "默认库") -> None:
         if self.ctx is None:
