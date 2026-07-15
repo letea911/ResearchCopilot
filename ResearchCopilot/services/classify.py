@@ -17,7 +17,8 @@ CLASSIFY_SYSTEM = (
 
 CLASSIFY_USER_TEMPLATE = """Paper title: {title}
 Authors: {authors}
-Existing collections: {collections}
+Library hierarchy (parent → sub-library):
+{collections}
 
 Full text:
 {chunks_text}
@@ -25,12 +26,18 @@ Full text:
 Return a JSON object with these keys:
 - "keywords": list of 3-5 relevant scientific keywords
 - "abstract": concise 2-3 sentence summary of the paper
-- "suggested_collection": best-matching existing collection name, or "" if none fit
-- "new_collection": suggested name for a new collection if none exist match, or ""
-- "confidence": number between 0.0 and 1.0 indicating how well the suggested collection fits
+- "suggested_parent": best-matching root library name (e.g. "电催化"), or "" if none fit
+- "suggested_collection": best-matching sub-library name (e.g. "高熵"), or "" if none fit
+- "new_parent": suggested new root library name if no existing parent fits, or ""
+- "new_collection": suggested new sub-library name (under parent or standalone), or ""
+- "confidence": number between 0.0 and 1.0
 
-Only suggest a collection if the paper clearly fits an existing one.
-Prefer specific collections (e.g. "OER", "LDH") over generic ones (e.g. "默认库")."""
+Rules:
+- Prefer placing papers in EXISTING sub-libraries when possible (fill suggested_parent + suggested_collection)
+- If the paper fits under an existing parent but needs a NEW sub-library, set suggested_parent="" and fill new_parent + new_collection
+- If no existing library fits at all, fill new_parent + new_collection
+- Leave new_* fields empty when existing libraries suffice
+- Prefer specific sub-libraries over generic ones"""
 
 
 class ClassifierService(BaseClassifierService):
@@ -59,8 +66,16 @@ class ClassifierService(BaseClassifierService):
         if len(chunks_text) > 6000:
             chunks_text = chunks_text[:6000]
 
-        collections = await self._meta_store.list_collections()
-        collections_display = ", ".join(collections) if collections else "默认库"
+        tree = await self._meta_store.get_collection_tree()
+        # Format hierarchy for the prompt: "电催化 → 高熵\n电催化 → OER\n默认库"
+        lines = []
+        for node in tree:
+            if node["children"]:
+                for child in node["children"]:
+                    lines.append(f"  {node['name']} → {child}")
+            else:
+                lines.append(f"  {node['name']}")
+        collections_display = "\n".join(lines) if lines else "  默认库"
 
         prompt = CLASSIFY_USER_TEMPLATE.format(
             title=doc.title or "Unknown",
@@ -83,6 +98,8 @@ class ClassifierService(BaseClassifierService):
             abstract=str(parsed.get("abstract", "") or ""),
             suggested_collection=str(parsed.get("suggested_collection", "") or ""),
             new_collection=str(parsed.get("new_collection", "") or ""),
+            suggested_parent=str(parsed.get("suggested_parent", "") or ""),
+            new_parent=str(parsed.get("new_parent", "") or ""),
             confidence=float(parsed.get("confidence", 0.0) or 0.0),
         )
 

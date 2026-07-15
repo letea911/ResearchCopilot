@@ -41,4 +41,6 @@ class ClassifyResult:
     abstract: str = ""
     suggested_collection: str = ""
     new_collection: str = ""
+    suggested_parent: str = ""   # root library (e.g. "电催化")
+    new_parent: str = ""         # suggested new root library
     confidence: float = 0.0

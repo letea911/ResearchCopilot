@@ -35,8 +35,10 @@ def mock_llm():
     m.chat.return_value = json.dumps({
         "keywords": ["OER", "LDH", "electrocatalysis"],
         "abstract": "This paper investigates OER performance of high-entropy LDHs.",
-        "suggested_collection": "OER",
+        "suggested_collection": "高熵",
         "new_collection": "",
+        "suggested_parent": "电催化",
+        "new_parent": "",
         "confidence": 0.92,
     })
     return m
@@ -69,7 +71,8 @@ async def test_classify_single_returns_structured_result(service, meta_store):
     assert "OER" in result.keywords
     assert "electrocatalysis" in result.keywords
     assert len(result.abstract) > 10
-    assert result.suggested_collection == "OER"
+    assert result.suggested_collection == "高熵"
+    assert result.suggested_parent == "电催化"
     assert result.confidence == 0.92
 
 
