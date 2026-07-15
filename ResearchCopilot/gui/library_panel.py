@@ -140,18 +140,22 @@ class LibraryPanel(QWidget):
         is_root = parent is None or parent is self.tree.invisibleRootItem()
 
         if is_root:
-            new_sub_action = menu.addAction("＋新建子库")
-        rename_action = menu.addAction("重命名")
+            menu.addAction("＋新建子库")
+        menu.addAction("重命名")
+        menu.addSeparator()
+        delete_action = menu.addAction("删除库")
 
         action = menu.exec_(self.tree.viewport().mapToGlobal(pos))
         if action is None:
             return
 
         import asyncio
-        if is_root and action == new_sub_action:
+        if is_root and action.text() == "＋新建子库":
             asyncio.ensure_future(self._async_new_sub(lib_name))
-        elif action == rename_action:
+        elif action.text() == "重命名":
             self._rename_library(item)
+        elif action == delete_action:
+            self._on_delete_collection(lib_name, is_root)
 
     async def _async_new_sub(self, parent_name: str) -> None:
         """Create a sub-library under a parent library."""
@@ -162,6 +166,37 @@ class LibraryPanel(QWidget):
         if not ok or not name:
             return
         await self.ctx["meta_store"].create_collection(name, parent=parent_name)
+        await self.refresh()
+
+    def _on_delete_collection(self, lib_name: str, is_root: bool) -> None:
+        """Confirm and delete a library. Documents are released to 默认库."""
+        if self.ctx is None:
+            return
+        # Confirm
+        level = "父库" if is_root else "子库"
+        msg = f"删除{level}「{lib_name}」？\n\n库中的文献会自动移到「默认库」。\n此操作不可撤销。"
+        reply = QMessageBox.question(
+            self, "确认删除", msg,
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+        )
+        if reply != QMessageBox.Yes:
+            return
+        import asyncio
+        asyncio.ensure_future(self._do_delete(lib_name))
+
+    async def _do_delete(self, lib_name: str) -> None:
+        meta = self.ctx["meta_store"]
+        vec = self.ctx["vector_store"]
+        moved = await meta.delete_collection(lib_name, reassign_to="默认库")
+        # Update vector metadata for documents that were reassigned
+        if moved > 0:
+            try:
+                await vec.update_metadata_by_filter(
+                    where={"collection": lib_name},
+                    updates={"collection": "默认库"},
+                )
+            except Exception:
+                pass
         await self.refresh()
 
     async def _create_and_refresh(self, name: str, parent: str | None) -> None:
@@ -283,17 +318,23 @@ class LibraryPanel(QWidget):
                 root_item.setFlags(root_item.flags() | Qt.ItemIsUserCheckable)
 
                 if children:
-                    # Has sub-libraries — root contains children
+                    # Has sub-libraries — show them AND any docs belonging
+                    # directly to the parent (so they don't vanish).
+                    parent_docs = await meta.list_documents(
+                        collection=root_name, limit=100000
+                    )
+                    total_docs += len(parent_docs)
+
                     for sub_name in children:
                         docs = await meta.list_documents(
                             collection=sub_name, limit=100000
                         )
                         sub_item = QTreeWidgetItem(root_item)
-                        sub_item.setText(0, f"{sub_name}  ({len(docs)})")
+                        sub_item.setText(0, f"  {sub_name}  ({len(docs)})")
                         sub_item.setFlags(sub_item.flags() | Qt.ItemIsUserCheckable)
                         sub_item.setCheckState(0, Qt.Checked)
                         sub_item.setData(0, Qt.UserRole + 1, sub_name)
-                        sub_item.setToolTip(0, f"「{root_name} → {sub_name}」\n（双击可重命名）")
+                        sub_item.setToolTip(0, f"「{root_name} → {sub_name}」\n右键可删除或重命名")
                         all_display_items.append(
                             (f"{root_name} → {sub_name}", sub_name)
                         )
@@ -308,7 +349,23 @@ class LibraryPanel(QWidget):
                                 f"{d_title}\n{doc.authors or ''}\n（双击可总结这篇）",
                             )
                             child.setData(0, Qt.UserRole, doc.id)
-                    # Root's checkstate: partly checked = some children checked
+                    # Show documents that belong directly to the parent
+                    for doc in parent_docs:
+                        d_title = doc.title or "（无标题）"
+                        year = doc.year if doc.year is not None else "—"
+                        child = QTreeWidgetItem(root_item)
+                        child.setText(0, f"{d_title[:38]}  ({year})")
+                        child.setToolTip(
+                            0,
+                            f"{d_title}\n{doc.authors or ''}\n（双击可总结这篇）",
+                        )
+                        child.setData(0, Qt.UserRole, doc.id)
+                    # Parent display: sub_count + parent_docs
+                    sub_count = len(children)
+                    root_item.setText(
+                        0,
+                        f"{root_name}  ({sub_count}子库, {len(parent_docs)}篇)"
+                    )
                     root_item.setCheckState(0, Qt.Checked if children else Qt.Unchecked)
                 else:
                     # No sub-libraries — docs directly under root
