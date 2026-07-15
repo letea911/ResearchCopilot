@@ -3,6 +3,7 @@ from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QPushButton,
     QTreeWidget, QTreeWidgetItem, QInputDialog, QFileDialog, QMessageBox,
+    QMenu,
 )
 
 
@@ -33,8 +34,8 @@ class LibraryPanel(QWidget):
 
         # Button row
         btn_row = QHBoxLayout()
-        self.new_btn = QPushButton("＋新建库")
-        self.new_btn.clicked.connect(self._on_new_collection)
+        self.new_btn = QPushButton("＋新建父库")
+        self.new_btn.clicked.connect(self._on_new_parent)
         btn_row.addWidget(self.new_btn)
         self.import_btn = QPushButton("导入PDF…")
         self.import_btn.clicked.connect(self._on_import_clicked)
@@ -49,9 +50,11 @@ class LibraryPanel(QWidget):
         self.tree.setHeaderHidden(True)
         self.tree.itemDoubleClicked.connect(self._on_item_double_clicked)
         self.tree.itemChanged.connect(self._on_item_changed)
+        self.tree.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.tree.customContextMenuRequested.connect(self._on_context_menu)
         layout.addWidget(self.tree, stretch=1)
 
-        hint = QLabel("勾选库限定检索范围（不勾=全部）。双击库名可重命名。")
+        hint = QLabel("勾选库限定检索范围（不勾=全部）。双击库名可重命名。右键父库可新建子库。")
         hint.setStyleSheet("color: #999; font-size: 11px;")
         layout.addWidget(hint)
 
@@ -104,34 +107,62 @@ class LibraryPanel(QWidget):
 
     # ---- Actions ------------------------------------------------------------
 
-    def _on_new_collection(self) -> None:
+    def _on_new_parent(self) -> None:
+        """Create a new root-level (parent) library. No parent selection needed."""
         if self.ctx is None:
             return
-        import asyncio
-        # Fetch root libraries for parent dropdown
-        loop = asyncio.get_event_loop()
-
-        async def _get_roots():
-            return await self.ctx["meta_store"].list_collections()  # root only
-        roots = loop.run_until_complete(_get_roots())
-
-        name, ok = QInputDialog.getText(self, "新建文献库", "库名称：")
+        name, ok = QInputDialog.getText(self, "新建父库", "父库名称：")
         name = (name or "").strip()
         if not ok or not name:
             return
+        import asyncio
+        asyncio.ensure_future(self._create_and_refresh(name, parent=None))
 
-        parent = None
-        if roots:
-            parent, pok = QInputDialog.getItem(
-                self, "父库（可选）", "归属到哪个父库下：",
-                ["(无，根级)"] + roots, 0, False,
-            )
-            if not pok:
-                return
-            if parent == "(无，根级)":
-                parent = None
+    def _on_context_menu(self, pos) -> None:
+        """Right-click context menu on tree items."""
+        item = self.tree.itemAt(pos)
+        if item is None or self.ctx is None:
+            return
 
-        asyncio.ensure_future(self._create_and_refresh(name, parent))
+        lib_name = item.data(0, Qt.UserRole + 1)  # library name if this is a lib node
+        doc_id = item.data(0, Qt.UserRole)          # doc_id if this is a document node
+
+        if doc_id:
+            return  # no context menu for documents
+
+        if not lib_name:
+            return
+
+        menu = QMenu(self)
+
+        # Determine if this is a root library (parent is invisible root or None)
+        parent = item.parent()
+        is_root = parent is None or parent is self.tree.invisibleRootItem()
+
+        if is_root:
+            new_sub_action = menu.addAction("＋新建子库")
+        rename_action = menu.addAction("重命名")
+
+        action = menu.exec_(self.tree.viewport().mapToGlobal(pos))
+        if action is None:
+            return
+
+        import asyncio
+        if is_root and action == new_sub_action:
+            asyncio.ensure_future(self._async_new_sub(lib_name))
+        elif action == rename_action:
+            self._rename_library(item)
+
+    async def _async_new_sub(self, parent_name: str) -> None:
+        """Create a sub-library under a parent library."""
+        name, ok = QInputDialog.getText(
+            self, "新建子库", f"在「{parent_name}」下新建子库："
+        )
+        name = (name or "").strip()
+        if not ok or not name:
+            return
+        await self.ctx["meta_store"].create_collection(name, parent=parent_name)
+        await self.refresh()
 
     async def _create_and_refresh(self, name: str, parent: str | None) -> None:
         await self.ctx["meta_store"].create_collection(name, parent=parent)
