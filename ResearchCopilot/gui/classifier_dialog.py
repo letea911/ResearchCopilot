@@ -4,7 +4,7 @@ import asyncio
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QRadioButton,
     QComboBox, QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView,
-    QButtonGroup, QMessageBox,
+    QButtonGroup,
 )
 from PyQt5.QtCore import Qt
 
@@ -22,9 +22,8 @@ class ClassifierDialog(QDialog):
         self.setWindowTitle("AI 文献分类器")
         self.resize(920, 600)
         self._build_ui()
-        # Populate library dropdown
-        names = self._list_collections_sync()
-        self.scope_combo.addItems(names)
+        # 异步加载库列表（不在 __init__ 里用 run_until_complete）
+        asyncio.ensure_future(self._init_collections())
 
     def was_saved(self) -> bool:
         return self._saved
@@ -66,9 +65,7 @@ class ClassifierDialog(QDialog):
         self.table.setColumnWidth(3, 100)
         self.table.setColumnWidth(4, 60)
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self.table.setEditTriggers(
-            QAbstractItemView.DoubleClicked
-        )
+        self.table.setEditTriggers(QAbstractItemView.DoubleClicked)
         layout.addWidget(self.table, stretch=1)
 
         # ---- Bottom bar ----
@@ -83,25 +80,13 @@ class ClassifierDialog(QDialog):
         bottom.addWidget(close_btn)
         layout.addLayout(bottom)
 
-    # ---- Scope helpers -----------------------------------------------------
+    # ---- Async init ---------------------------------------------------------
 
-    def _list_collections_sync(self) -> list[str]:
-        loop = asyncio.get_event_loop()
-        return loop.run_until_complete(
-            self.ctx["meta_store"].list_collections()
-        ) or ["默认库"]
-
-    def _collect_doc_ids(self) -> list[str]:
-        if self.radio_sel.isChecked():
-            ids = self._library_panel.get_selected_doc_ids()
-            return ids or []
-        # Entire library
-        collection = self.scope_combo.currentText()
-        loop = asyncio.get_event_loop()
-        docs = loop.run_until_complete(
-            self.ctx["meta_store"].list_documents(collection=collection, limit=100000)
-        )
-        return [d.id for d in docs]
+    async def _init_collections(self):
+        names = await self.ctx["meta_store"].list_collections()
+        if not names:
+            names = ["默认库"]
+        self.scope_combo.addItems(names)
 
     # ---- Start classification ----------------------------------------------
 
@@ -110,13 +95,29 @@ class ClassifierDialog(QDialog):
         self.save_btn.setEnabled(False)
         self.table.setRowCount(0)
         self._results = []
-        doc_ids = self._collect_doc_ids()
+        # 转为异步——不能在运行中的事件循环上用 run_until_complete
+        asyncio.ensure_future(self._collect_and_run())
+
+    async def _collect_and_run(self):
+        doc_ids = await self._collect_doc_ids_async()
         if not doc_ids:
             self.status_label.setText("没有找到文献。")
             self.start_btn.setEnabled(True)
             return
         self.status_label.setText(f"正在分析 0/{len(doc_ids)}…")
-        asyncio.ensure_future(self._run_classify(doc_ids))
+        await self._run_classify(doc_ids)
+
+    async def _collect_doc_ids_async(self) -> list[str]:
+        if self.radio_sel.isChecked():
+            ids = self._library_panel.get_selected_doc_ids()
+            return ids or []
+        collection = self.scope_combo.currentText()
+        if not collection:
+            return []
+        docs = await self.ctx["meta_store"].list_documents(
+            collection=collection, limit=100000
+        )
+        return [d.id for d in docs]
 
     async def _run_classify(self, doc_ids: list[str]):
         meta = self.ctx["meta_store"]
@@ -158,7 +159,6 @@ class ClassifierDialog(QDialog):
             # 目标库 (QComboBox，包含现有库 + AI 建议新建)
             combo = QComboBox()
             combo.addItems(collection_names)
-            # 如果AI建议新建且有名字且不在现有列表中，追加到列表
             if result.new_collection and result.new_collection.strip():
                 nc = result.new_collection.strip()
                 existing = [combo.itemText(j) for j in range(combo.count())]
@@ -208,9 +208,8 @@ class ClassifierDialog(QDialog):
                 abstract = (abs_item.text() or "").strip() if abs_item else ""
                 collection = combo.currentText() if combo else result.suggested_collection
 
-                # 解析可能的 "＋新建「xxx」" 格式
                 if collection and collection.startswith("＋新建「"):
-                    collection = collection[4:-1]  # strip prefix + brackets
+                    collection = collection[4:-1]
                     await meta.create_collection(collection)
 
                 await meta.update_document_metadata(
