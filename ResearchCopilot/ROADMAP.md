@@ -7,8 +7,8 @@
 ## 当前状态
 
 - 📅 最后更新：2026-07-15
-- 🔄 当前阶段：Phase 7 — 多文献库（collection）完成
-- ⏳ 下一里程碑：用户亲测多库功能；后续 Experiments 模块
+- 🔄 当前阶段：Phase 8 — AI 分类器完成
+- ⏳ 下一里程碑：用户亲测分类器 + 多库功能；后续 Experiments 模块
 
 ---
 
@@ -122,6 +122,17 @@
 
 **测试总计：96/96 PASS**
 
+### Phase 8: AI 分类器 ✅
+
+| 任务 | 状态 | 日期 |
+|---|---|---|
+| 存储：expand update_document_metadata(keywords/abstract/collection) + FTS5 rebuild | ✅ | 2026-07-15 |
+| 服务：新建 ClassifierService — LLM 返回 JSON（关键词+摘要+推荐库+新库建议+置信度） | ✅ | 2026-07-15 |
+| GUI：ClassifierDialog(QDialog+QTableWidget) — 范围选择/逐行编辑/QComboBox选库/批量保存 | ✅ | 2026-07-15 |
+| CLI：classify 命令 — --doc-id / --collection / --dry-run | ✅ | 2026-07-15 |
+
+**测试总计：66/66 PASS**
+
 ### Future: 后续版本
 
 | 模块 | 说明 |
@@ -164,6 +175,7 @@
 
 | 日期 | 关键进展 |
 |---|---|
+| 2026-07-15 | Phase 8：AI 分类器 — 自动提取关键词+摘要+推荐分组；GUI QTableWidget 弹窗逐行确认/修改/批量保存；CLI classify 命令 |
 | 2026-07-15 | Phase 7：多文献库（命名库、按库导入、按库检索问答、GUI 可勾选库树+下拉+建库+导入按钮）；修复向量不过滤老缺口 |
 | 2026-07-14 | Phase 6 打磨：修双击闪退（python 指向 Anaconda）+ 引用PDF改系统外部打开（不再窗口内乱码）+ 双击文献一键总结 + 聊天区“思考中”自动消失/自动滚底 + 修界面“未响应”（embedding 计算移后台线程，不再卡界面）|
 | 2026-07-08 | Phase 6：PyQt5 桌面 GUI（聊天+文献列表+拖拽导入）；Phase 5 补全 P2（enrich 元数据修正 + compare 多篇对比）|

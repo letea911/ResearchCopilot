@@ -31,7 +31,17 @@ C:/ProgramData/anaconda3/python.exe -m cli.main ask "你的问题"
 
 ## 📋 每日开发日志 (Daily Dev Log)
 
-### 2026-07-15
+### 2026-07-15 (Phase 8)
+- **今日目标**: Phase 8 AI 分类器（自动提取关键词+摘要+推荐分组）
+- **完成事项**:
+  - ✅ **Phase 1 存储扩展**：`update_document_metadata` 加 keywords/abstract/collection 参数 + FTS5 重建（更新后关键词可被 FTS 搜索到）
+  - ✅ **Phase 2 服务**：`ClassifierService.classify_single/batch` — 复用 summarize 的"拿全文→调 LLM→解析 JSON"链路 + metadata 的 `temperature=0.0` 模式；`ClassifyResult` dataclass
+  - ✅ **Phase 3 GUI**：`ClassifierDialog(QDialog+QTableWidget)` — 两种范围（整个库/勾选文献）；AI 分析时进度显示；表格逐行：关键词(可编辑)+摘要(可编辑)+目标库(QComboBox 含"新建xxx")+置信度；全部保存按钮
+  - ✅ **Phase 4 CLI**：`classify` 命令 — `--doc-id` / `--collection` / `--dry-run`
+  - ✅ **验证**：storage 37 + services 14(含 5 个新 classify 测试) + CLI 10 + retrieval 5 = 66/66 PASS
+- **明日计划**: 用户亲测分类器；后续 Experiments 实验数据模块
+
+### 2026-07-15 (Phase 7)
 - **今日目标**: Phase 7 多文献库（命名库 + 按库导入 + 按库检索问答）
 - **完成事项**:
   - ✅ **Phase A 存储层**：DocumentRecord 加 `collection` 字段（默认"默认库"）；SQLite 幂等迁移（ALTER TABLE ADD COLUMN DEFAULT）平滑兼容40篇；collections 库名表 + list_collections/create_collection
