@@ -49,6 +49,8 @@ class MainWindow(QMainWindow):
         self.library_panel.import_requested.connect(self._on_import_requested)
         # 「AI 分类器」按钮 → 打开分类对话框
         self.library_panel.classify_requested.connect(self._on_classify_requested)
+        # 聊天区「导出为分组」→ 创建 reading list
+        self.chat_panel.export_to_list_requested.connect(self._on_export_to_list)
 
         self.setCentralWidget(central)
 
@@ -130,6 +132,22 @@ class MainWindow(QMainWindow):
         dlg.exec_()
         if dlg.was_saved():
             asyncio.ensure_future(self.library_panel.refresh(self.ctx))
+
+    def _on_export_to_list(self, name: str, doc_ids: list) -> None:
+        """聊天区导出勾选文献 → 创建阅读清单。"""
+        if self.ctx is None:
+            return
+        asyncio.ensure_future(self._do_export_to_list(name, doc_ids))
+
+    async def _do_export_to_list(self, name: str, doc_ids: list) -> None:
+        meta = self.ctx["meta_store"]
+        lid = await meta.create_reading_list(name)
+        if lid:
+            added = await meta.add_to_reading_list(lid, doc_ids)
+            self.set_status(f"已创建阅读清单「{name}」({added}篇)")
+            await self.library_panel.refresh(self.ctx)
+        else:
+            self.set_status("创建清单失败")
 
     async def _ingest_file(self, path: str, collection: str = "默认库") -> None:
         if self.ctx is None:
