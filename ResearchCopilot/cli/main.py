@@ -410,6 +410,66 @@ def backfill_collections(value):
 
 
 @cli.command()
+@click.option("--doc-id", default=None, help="Single document ID to classify")
+@click.option("--collection", "coll_name", default=None, help="Classify all docs in a library")
+@click.option("--save/--dry-run", default=True, help="Save results to DB (default: save)")
+def classify(doc_id, coll_name, save):
+    """AI classifier: extract keywords, abstract, and suggest collection."""
+    ctx = _get_context()
+    _init_stores(ctx)
+    meta = ctx["meta_store"]
+    svc = ctx["classify"]
+
+    async def _run():
+        if doc_id:
+            ids = [doc_id]
+        elif coll_name:
+            docs = await meta.list_documents(collection=coll_name, limit=100000)
+            ids = [d.id for d in docs]
+        else:
+            console.print("[yellow]Specify --doc-id or --collection[/yellow]")
+            return
+
+        if not ids:
+            console.print("No documents found.")
+            return
+
+        console.print(f"Classifying [bold]{len(ids)}[/bold] document(s)...\n")
+        results = await svc.classify_batch(ids)
+
+        for r in results:
+            status_icon = "[green]✓[/green]" if r.suggested_collection else "[yellow]~[/yellow]"
+            console.print(f"{status_icon} [bold]{r.document_id[:8]}[/bold]")
+            console.print(f"   关键词: {', '.join(r.keywords) if r.keywords else '(无)'}")
+            console.print(f"   摘要: {r.abstract[:100]}{'…' if len(r.abstract)>100 else ''}")
+            if r.suggested_collection:
+                console.print(f"   推荐库: [cyan]{r.suggested_collection}[/cyan]")
+            if r.new_collection:
+                console.print(f"   建议新建: [cyan]+{r.new_collection}[/cyan]")
+            console.print(f"   置信度: {r.confidence:.0%}")
+
+            if save:
+                kw = ", ".join(r.keywords) if r.keywords else None
+                collection = r.new_collection or r.suggested_collection or None
+                if collection and collection.startswith(""):
+                    # already clean name
+                    pass
+                await meta.update_document_metadata(
+                    r.document_id,
+                    keywords=kw,
+                    abstract=r.abstract or None,
+                    collection=collection,
+                )
+                if r.new_collection:
+                    await meta.create_collection(r.new_collection)
+            console.print()
+
+        console.print(f"[bold]Done.[/bold] {'[green]Saved to DB.[/green]' if save else '[dim]Dry-run, not saved.[/dim]'}")
+
+    asyncio.run(_run())
+
+
+@cli.command()
 def status():
     """Show knowledge base status."""
     ctx = _get_context()
