@@ -22,6 +22,7 @@ class FakeMetadataStore(BaseMetadataStore):
     async def list_documents(self, document_type=None, year=None, collection=None, limit=50): return []
     async def list_collections(self): return []
     async def create_collection(self, name): pass
+    async def rename_collection(self, old_name, new_name): return True
     async def insert_chunks(self, chunks): pass
     async def get_chunks_by_document(self, document_id): return []
     async def get_chunk_by_chroma_id(self, chroma_id): return None
@@ -34,6 +35,7 @@ class FakeVectorStore(BaseVectorStore):
     async def delete(self, ids): pass
     async def count(self): return 0
     async def backfill_metadata(self, key, value): return 0
+    async def update_metadata_by_filter(self, where, updates): return 0
 
 
 def test_file_store_instantiable():

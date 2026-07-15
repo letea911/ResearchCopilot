@@ -190,6 +190,32 @@ class SQLiteMetadataStore(BaseMetadataStore):
         )
         await self._conn.commit()
 
+    async def rename_collection(self, old_name: str, new_name: str) -> bool:
+        """Rename a library. Updates collections table + all documents in it.
+        Returns False if new_name already exists (collision)."""
+        old_name = (old_name or "").strip()
+        new_name = (new_name or "").strip()
+        if not old_name or not new_name or old_name == new_name:
+            return False
+
+        # Check for collision
+        cur = await self._conn.execute(
+            "SELECT 1 FROM collections WHERE name = ?", (new_name,)
+        )
+        if await cur.fetchone():
+            return False  # target name already taken
+
+        await self._conn.execute(
+            "UPDATE OR REPLACE collections SET name = ? WHERE name = ?",
+            (new_name, old_name),
+        )
+        await self._conn.execute(
+            "UPDATE documents SET collection = ? WHERE collection = ?",
+            (new_name, old_name),
+        )
+        await self._conn.commit()
+        return True
+
     async def insert_chunks(self, chunks: list[ChunkRecord]) -> None:
         await self._conn.executemany(
             """INSERT INTO chunks (id, document_id, chunk_index, content,

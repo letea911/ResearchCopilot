@@ -191,6 +191,33 @@ async def test_insert_document_registers_collection(store):
 
 
 @pytest.mark.asyncio
+async def test_rename_collection(store):
+    await store.create_collection("OLD")
+    await store.insert_document(DocumentRecord(
+        id="rn-1", document_type="literature", title="Rename me",
+        collection="OLD"))
+    assert await store.rename_collection("OLD", "NEW") is True
+    assert "OLD" not in await store.list_collections()
+    assert "NEW" in await store.list_collections()
+    doc = await store.get_document("rn-1")
+    assert doc.collection == "NEW"
+
+
+@pytest.mark.asyncio
+async def test_rename_collection_collision_returns_false(store):
+    await store.create_collection("A")
+    await store.create_collection("B")
+    assert await store.rename_collection("A", "B") is False  # B exists
+    assert "A" in await store.list_collections()
+
+
+@pytest.mark.asyncio
+async def test_rename_collection_same_name_returns_false(store):
+    await store.create_collection("X")
+    assert await store.rename_collection("X", "X") is False
+
+
+@pytest.mark.asyncio
 async def test_update_metadata_keywords_abstract_collection(store):
     await store.insert_document(DocumentRecord(
         id="upd-1", document_type="literature", title="Update test",

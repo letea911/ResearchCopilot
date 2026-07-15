@@ -78,19 +78,34 @@ class ChromaVectorStore(BaseVectorStore):
         without `key`, and updates only their metadata — vectors are NOT
         recomputed. Returns the number updated.
         """
-        got = self._collection.get(include=["metadatas"])
+        return await self.update_metadata_by_filter(
+            {key: None}, {key: value}
+        )
+
+    async def update_metadata_by_filter(
+        self, where: dict, updates: dict
+    ) -> int:
+        """Update metadata on vectors matching `where`, preserving other keys.
+
+        Uses ChromaDB get(where=...) then collection.update(ids, metadatas).
+        Returns the number updated.
+        """
+        kwargs = {"where": where, "include": ["metadatas"]}
+        got = self._collection.get(**kwargs)
         ids = got.get("ids") or []
         metadatas = got.get("metadatas") or []
 
+        updated = 0
         upd_ids, upd_mds = [], []
         for i, vid in enumerate(ids):
             md = metadatas[i] if i < len(metadatas) and metadatas[i] else {}
-            if md.get(key) in (None, ""):
-                new_md = dict(md)
-                new_md[key] = value
-                upd_ids.append(vid)
-                upd_mds.append(new_md)
+            new_md = dict(md)
+            for k, v in updates.items():
+                new_md[k] = v
+            upd_ids.append(vid)
+            upd_mds.append(new_md)
+            updated += 1
 
         if upd_ids:
             self._collection.update(ids=upd_ids, metadatas=upd_mds)
-        return len(upd_ids)
+        return updated

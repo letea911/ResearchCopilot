@@ -121,9 +121,42 @@ class LibraryPanel(QWidget):
     def _on_item_double_clicked(self, item: QTreeWidgetItem, _column: int) -> None:
         doc_id = item.data(0, Qt.UserRole)
         if not doc_id:
-            return  # a library node, not a document
+            # Library node — rename collection
+            self._rename_library(item)
+            return
         title = (item.toolTip(0) or item.text(0)).split("\n", 1)[0]
         self.summarize_requested.emit(doc_id, title)
+
+    def _rename_library(self, item: QTreeWidgetItem) -> None:
+        if self.ctx is None:
+            return
+        old_name = item.data(0, Qt.UserRole + 1)
+        if not old_name:
+            return
+        new_name, ok = QInputDialog.getText(
+            self, "重命名文献库", "新名称：", text=old_name
+        )
+        new_name = (new_name or "").strip()
+        if not ok or not new_name or new_name == old_name:
+            return
+        import asyncio
+        asyncio.ensure_future(self._do_rename(old_name, new_name))
+
+    async def _do_rename(self, old_name: str, new_name: str) -> None:
+        meta = self.ctx["meta_store"]
+        vec = self.ctx["vector_store"]
+        ok = await meta.rename_collection(old_name, new_name)
+        if not ok:
+            return  # collision or invalid — silently skip; refresh will show unchanged
+        # Update Chroma vector metadata so the collection filter still works
+        try:
+            await vec.update_metadata_by_filter(
+                where={"collection": old_name},
+                updates={"collection": new_name},
+            )
+        except Exception:
+            pass  # best-effort; SQLite side is already correct
+        await self.refresh()
 
     # ---- Refresh -----------------------------------------------------------
 
@@ -153,6 +186,7 @@ class LibraryPanel(QWidget):
             lib_node.setFlags(lib_node.flags() | Qt.ItemIsUserCheckable)
             lib_node.setCheckState(0, Qt.Checked if name in prev_checked else Qt.Unchecked)
             lib_node.setData(0, Qt.UserRole + 1, name)  # library name
+            lib_node.setToolTip(0, f"「{name}」\n（双击可重命名库）")
             for doc in docs:
                 d_title = doc.title or "（无标题）"
                 year = doc.year if doc.year is not None else "—"

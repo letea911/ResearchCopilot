@@ -67,6 +67,11 @@ class BaseMetadataStore(ABC):
         ...
 
     @abstractmethod
+    async def rename_collection(self, old_name: str, new_name: str) -> bool:
+        """Rename a library. Returns False if target name exists."""
+        ...
+
+    @abstractmethod
     async def insert_chunks(self, chunks: list[ChunkRecord]) -> None:
         """Insert chunk records in batch."""
         ...
