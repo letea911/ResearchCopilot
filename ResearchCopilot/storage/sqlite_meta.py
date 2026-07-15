@@ -45,8 +45,6 @@ class SQLiteMetadataStore(BaseMetadataStore):
                 created_at TEXT DEFAULT ''
             );
 
-            CREATE INDEX IF NOT EXISTS idx_collections_parent ON collections(parent);
-
             CREATE TABLE IF NOT EXISTS chunks (
                 id TEXT PRIMARY KEY,
                 document_id TEXT NOT NULL,
@@ -99,6 +97,12 @@ class SQLiteMetadataStore(BaseMetadataStore):
             await self._conn.commit()
         except Exception:
             pass  # column already exists
+
+        # Index must be created AFTER the migration above (which may add the parent column
+        # to an existing database that still lacks it).
+        await self._conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_collections_parent ON collections(parent)"
+        )
 
         # Seed the collections table: always ensure 默认库 exists, and absorb any
         # library names already present on documents (so historical data shows up).
