@@ -16,6 +16,7 @@ class ChatPanel(QWidget):
         super().__init__(parent)
         self.ctx = None
         self.history: list[ChatMessage] = []
+        self._collections_provider = None  # callable -> list[str] | None
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(8, 8, 8, 8)
@@ -55,6 +56,19 @@ class ChatPanel(QWidget):
     def set_context(self, ctx: dict) -> None:
         self.ctx = ctx
         self.set_input_enabled(True)
+
+    def set_collections_provider(self, provider) -> None:
+        """Register a callback returning the currently-selected libraries
+        (list[str] or None = all) so questions can be scoped to them."""
+        self._collections_provider = provider
+
+    def _current_collections(self):
+        if self._collections_provider is None:
+            return None
+        try:
+            return self._collections_provider()
+        except Exception:
+            return None
 
     def _on_send(self) -> None:
         if self.ctx is None:
@@ -102,6 +116,11 @@ class ChatPanel(QWidget):
 
     async def _ask(self, question: str) -> None:
         self.set_input_enabled(False)
+        collections = self._current_collections()
+        if collections:
+            self.browser.append(
+                f"<span style='color:#888;'>（检索范围：{html.escape('、'.join(collections))}）</span>"
+            )
         self.browser.append("<i>思考中…</i>")
         self._scroll_to_bottom()
         try:
@@ -109,6 +128,7 @@ class ChatPanel(QWidget):
                 question,
                 conversation_history=self.history[-6:],
                 top_k=10,
+                collections=collections,
             )
             self._remove_thinking()
             self._render_result(result)

@@ -45,6 +45,8 @@ class MainWindow(QMainWindow):
 
         # 双击左侧文献 → 聊天区总结这篇
         self.library_panel.summarize_requested.connect(self.chat_panel.request_summary)
+        # 「导入PDF…」选好文件 → 导入到目标库
+        self.library_panel.import_requested.connect(self._on_import_requested)
 
         self.setCentralWidget(central)
 
@@ -68,6 +70,8 @@ class MainWindow(QMainWindow):
 
         self.ctx = ctx
         self.chat_panel.set_context(ctx)
+        # 让聊天区发问时能拿到当前勾选的库（检索范围）
+        self.chat_panel.set_collections_provider(self.library_panel.selected_collections)
         self.library_panel.set_context(ctx)
         await self.library_panel.refresh(ctx)
 
@@ -93,21 +97,31 @@ class MainWindow(QMainWindow):
             self.set_status("还在加载模型，请稍候")
             event.ignore()
             return
+        collection = self.library_panel.target_collection()
         for url in event.mimeData().urls():
             path = url.toLocalFile()
             if path.lower().endswith(".pdf"):
-                asyncio.ensure_future(self._ingest_file(path))
+                asyncio.ensure_future(self._ingest_file(path, collection))
         event.acceptProposedAction()
 
-    async def _ingest_file(self, path: str) -> None:
+    def _on_import_requested(self, collection: str, paths: list) -> None:
+        """「导入PDF…」按钮选好文件后逐个导入到目标库。"""
+        if self.ctx is None:
+            self.set_status("还在加载模型，请稍候")
+            return
+        for path in paths:
+            if str(path).lower().endswith(".pdf"):
+                asyncio.ensure_future(self._ingest_file(path, collection))
+
+    async def _ingest_file(self, path: str, collection: str = "默认库") -> None:
         if self.ctx is None:
             self.set_status("还在加载模型，请稍候")
             return
         name = Path(path).name
-        self.set_status(f"正在导入 {name}…")
+        self.set_status(f"正在导入 {name} → {collection}…")
         try:
-            await self.ctx["pipeline"].ingest(Path(path))
+            await self.ctx["pipeline"].ingest(Path(path), collection=collection)
             await self.library_panel.refresh(self.ctx)
-            self.set_status(f"导入完成: {name}")
+            self.set_status(f"导入完成: {name} → {collection}")
         except Exception as exc:  # noqa: BLE001
             self.set_status(f"导入失败 {name}: {exc}")
