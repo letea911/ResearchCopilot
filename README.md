@@ -31,6 +31,18 @@ C:/ProgramData/anaconda3/python.exe -m cli.main ask "你的问题"
 
 ## 📋 每日开发日志 (Daily Dev Log)
 
+### 2026-07-15
+- **今日目标**: Phase 7 多文献库（命名库 + 按库导入 + 按库检索问答）
+- **完成事项**:
+  - ✅ **Phase A 存储层**：DocumentRecord 加 `collection` 字段（默认"默认库"）；SQLite 幂等迁移（ALTER TABLE ADD COLUMN DEFAULT）平滑兼容40篇；collections 库名表 + list_collections/create_collection
+  - ✅ **Phase B 导入**：`ingest(source, collection)`；向量 metadata 加 `collection` 键
+  - ✅ **Phase C 检索**：keyword/hybrid/service 全链路 collections 过滤 + 补向量不过滤老缺口
+  - ✅ **Phase D CLI**：所有命令 `--collection` + 新命令 list-collections/backfill-collections
+  - ✅ **Phase E GUI**：左侧 QTreeWidget（可勾选库+文献子节点）；导入到下拉+新建库+导入PDF按钮；按库问答
+  - ✅ **验证**：96/96 PASS（storage 36 + ingestion 47 + retrieval/services 30 + cli 10）+ offscreen 集成树构建通过
+- **遇到问题**: 新增 ABC 方法后 test_interfaces 假类缺实现(2 fail)→补方法；hybrid 断言要同步更新
+- **明日计划**: 用户亲测多库功能；后续 Experiments 实验数据模块
+
 ### 2026-07-14
 - **今日目标**: Phase 6 桌面 GUI 打磨（联调修 bug + 易用性）
 - **完成事项**:

@@ -6,9 +6,9 @@
 
 ## 当前状态
 
-- 📅 最后更新：2026-07-14
-- 🔄 当前阶段：Phase 6 — 桌面 GUI（PyQt5）打磨中
-- ⏳ 下一里程碑：用户亲测 GUI；后续 Experiments 模块
+- 📅 最后更新：2026-07-15
+- 🔄 当前阶段：Phase 7 — 多文献库（collection）完成
+- ⏳ 下一里程碑：用户亲测多库功能；后续 Experiments 模块
 
 ---
 
@@ -110,6 +110,18 @@
 
 **已知限制：** 少数 PDF 作者仍误提取（软件用户名如 Administrator/lgq）；journal 偶有关键词误报（Science）
 
+### Phase 7: 多文献库 ✅
+
+| 任务 | 状态 | 日期 |
+|---|---|---|
+| 存储层：DocumentRecord 加 collection 字段 + SQLite 幂等迁移 + collections 库名表 | ✅ | 2026-07-15 |
+| 导入：ingest/ingest_batch 支持 --collection 参数 + 向量 metadata 写入 | ✅ | 2026-07-15 |
+| 检索：keyword/hybrid/service 全链路 collections 过滤 + 补向量不过滤缺口 | ✅ | 2026-07-15 |
+| CLI：所有命令加 --collection + 新命令 list-collections / backfill-collections | ✅ | 2026-07-15 |
+| GUI：QTreeWidget 可勾选库树 + 导入目标下拉 + 新建库/导入PDF按钮 + 按库问答 | ✅ | 2026-07-15 |
+
+**测试总计：96/96 PASS**
+
 ### Future: 后续版本
 
 | 模块 | 说明 |
@@ -152,6 +164,7 @@
 
 | 日期 | 关键进展 |
 |---|---|
+| 2026-07-15 | Phase 7：多文献库（命名库、按库导入、按库检索问答、GUI 可勾选库树+下拉+建库+导入按钮）；修复向量不过滤老缺口 |
 | 2026-07-14 | Phase 6 打磨：修双击闪退（python 指向 Anaconda）+ 引用PDF改系统外部打开（不再窗口内乱码）+ 双击文献一键总结 + 聊天区“思考中”自动消失/自动滚底 + 修界面“未响应”（embedding 计算移后台线程，不再卡界面）|
 | 2026-07-08 | Phase 6：PyQt5 桌面 GUI（聊天+文献列表+拖拽导入）；Phase 5 补全 P2（enrich 元数据修正 + compare 多篇对比）|
 | 2026-07-08 | Phase 5：增强引用 + PDF 直达 + LLM 元数据提取 + ingest-dir + P1（section/页码溯源 + chat 多轮对话）|
