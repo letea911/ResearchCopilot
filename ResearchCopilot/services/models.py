@@ -31,3 +31,14 @@ class SearchResponse:
     query: str
     results: list[RetrievedChunk] = field(default_factory=list)
     total_hits: int = 0
+
+
+@dataclass
+class ClassifyResult:
+    """AI classifier output for a single document."""
+    document_id: str
+    keywords: list[str] = field(default_factory=list)
+    abstract: str = ""
+    suggested_collection: str = ""
+    new_collection: str = ""
+    confidence: float = 0.0

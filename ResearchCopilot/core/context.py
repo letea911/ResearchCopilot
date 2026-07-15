@@ -30,6 +30,7 @@ def build_context() -> dict:
     from services.chat import ChatService
     from services.search import SearchService
     from services.summarize import SummarizeService
+    from services.classify import ClassifierService
 
     llm_cfg, emb_cfg, chunk_cfg, storage_cfg = load_config()
 
@@ -58,11 +59,13 @@ def build_context() -> dict:
     chat = ChatService(llm, embedder, hybrid_retriever, meta_store, file_store)
     search = SearchService(embedder, hybrid_retriever)
     summarize = SummarizeService(llm, meta_store, file_store)
+    classify = ClassifierService(llm, meta_store)
 
     return {
         "llm": llm, "embedder": embedder,
         "file_store": file_store, "meta_store": meta_store, "vector_store": vector_store,
         "pipeline": pipeline, "chat": chat, "search": search, "summarize": summarize,
+        "classify": classify,
     }
 
 

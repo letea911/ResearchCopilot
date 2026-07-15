@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
 from models.message import ChatMessage
-from services.models import ServiceResponse, SearchResponse
+from services.models import ServiceResponse, SearchResponse, ClassifyResult
 
 
 class BaseChatService(ABC):
@@ -31,3 +31,10 @@ class BaseSummarizeService(ABC):
     @abstractmethod
     async def compare(self, document_ids: list[str],
                       focus: str | None = None) -> ServiceResponse: ...
+
+
+class BaseClassifierService(ABC):
+    @abstractmethod
+    async def classify_single(self, document_id: str) -> ClassifyResult: ...
+    @abstractmethod
+    async def classify_batch(self, document_ids: list[str]) -> list[ClassifyResult]: ...
