@@ -43,7 +43,8 @@ def build_context() -> dict:
 
     keyword_retriever = SQLiteFTS5Retriever(storage_cfg)
     vector_retriever = ChromaVectorRetriever(vector_store, meta_store)
-    hybrid_retriever = WeightedHybridRetriever(keyword_retriever, vector_retriever)
+    hybrid_retriever = WeightedHybridRetriever(keyword_retriever, vector_retriever,
+                                                  meta_store=meta_store)
 
     pipeline = IngestionPipeline(
         parsers={".pdf": PyMuPDFParser()},

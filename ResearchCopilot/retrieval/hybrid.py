@@ -9,9 +9,11 @@ class WeightedHybridRetriever(BaseHybridRetriever):
     configurable weights to each source and deduplicating by chunk_id.
     """
 
-    def __init__(self, keyword: BaseKeywordRetriever, vector: BaseVectorRetriever):
+    def __init__(self, keyword: BaseKeywordRetriever, vector: BaseVectorRetriever,
+                 meta_store=None):
         self._keyword = keyword
         self._vector = vector
+        self._meta_store = meta_store  # optional; for expand_collections
         self._k = 60  # RRF constant
 
     async def search(
@@ -24,6 +26,10 @@ class WeightedHybridRetriever(BaseHybridRetriever):
         keyword_weight: float = 0.3,
         vector_weight: float = 0.7,
     ) -> list[RetrievedChunk]:
+        # Expand parent collections to include all leaf children
+        if collections and self._meta_store:
+            collections = await self._meta_store.expand_collections(collections)
+
         # Build the vector-side metadata filter (this closes the gap where the
         # vector retriever was previously called with no filter at all).
         conditions = []

@@ -85,3 +85,20 @@ async def test_hybrid_passes_collections_filter(retriever, mock_keyword, mock_ve
     mock_vector.search.assert_called_once_with(
         [0.1], top_k=20, where={"collection": {"$in": ["OER", "LDH"]}}
     )
+
+
+@pytest.mark.asyncio
+async def test_hybrid_expands_collections(mock_keyword, mock_vector):
+    from unittest.mock import AsyncMock
+    meta = AsyncMock()
+    meta.expand_collections.return_value = ["电催化", "高熵", "异质结构"]
+    retriever = WeightedHybridRetriever(mock_keyword, mock_vector, meta_store=meta)
+    await retriever.search("query", [0.1], top_k=10,
+                           collections=["电催化"])
+    # Should call expand_collections with the original list
+    meta.expand_collections.assert_called_once_with(["电催化"])
+    # keyword gets the expanded list
+    mock_keyword.search.assert_called_once_with(
+        "query", top_k=20, document_type=None,
+        collections=["电催化", "高熵", "异质结构"]
+    )
