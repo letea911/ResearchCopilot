@@ -131,7 +131,15 @@ class ClassifierDialog(QDialog):
                 doc_map[did] = d
 
         total = len(doc_ids)
-        collection_names = await meta.list_collections()
+        tree_data = await meta.get_collection_tree()
+        # Build flat display list: "根库 → 子库" for nested, "根库" for root-only
+        display_names = []
+        for node in tree_data:
+            if node["children"]:
+                for child in node["children"]:
+                    display_names.append(f"{node['name']} → {child}")
+            else:
+                display_names.append(node["name"])
 
         for i, doc_id in enumerate(doc_ids):
             self.status_label.setText(f"正在分析 {i+1}/{total}…")
@@ -156,20 +164,31 @@ class ClassifierDialog(QDialog):
             # 摘要 (可编辑)
             self.table.setItem(row, 2, QTableWidgetItem(result.abstract))
 
-            # 目标库 (QComboBox，包含现有库 + AI 建议新建)
+            # 目标库 (QComboBox，显示嵌套层级 + AI 建议新建)
             combo = QComboBox()
-            combo.addItems(collection_names)
-            if result.new_collection and result.new_collection.strip():
-                nc = result.new_collection.strip()
-                existing = [combo.itemText(j) for j in range(combo.count())]
-                if nc not in existing:
-                    combo.addItem(f"＋新建「{nc}」")
-                    combo.setCurrentIndex(combo.count() - 1)
-                else:
-                    idx = existing.index(nc)
-                    combo.setCurrentIndex(idx)
+            combo.addItems(display_names)
+            # Determine AI's suggested leaf in display format
+            suggested_display = ""
+            if result.suggested_parent and result.suggested_collection:
+                suggested_display = f"{result.suggested_parent} → {result.suggested_collection}"
             elif result.suggested_collection:
-                idx = combo.findText(result.suggested_collection)
+                suggested_display = result.suggested_collection
+            # If AI suggests a new sub or parent, append a "新建" entry
+            new_name = result.new_collection or ""
+            new_parent = result.new_parent or ""
+            if new_parent and new_name:
+                new_label = f"＋新建「{new_parent} → {new_name}」"
+            elif new_name:
+                new_label = f"＋新建「{new_name}」"
+            else:
+                new_label = ""
+            if new_label:
+                existing = [combo.itemText(j) for j in range(combo.count())]
+                if new_label not in existing:
+                    combo.addItem(new_label)
+                    combo.setCurrentIndex(combo.count() - 1)
+            elif suggested_display:
+                idx = combo.findText(suggested_display)
                 if idx >= 0:
                     combo.setCurrentIndex(idx)
             self.table.setCellWidget(row, 3, combo)
@@ -206,11 +225,23 @@ class ClassifierDialog(QDialog):
 
                 keywords = (kw_item.text() or "").strip() if kw_item else ""
                 abstract = (abs_item.text() or "").strip() if abs_item else ""
-                collection = combo.currentText() if combo else result.suggested_collection
+                collection = combo.currentText() if combo else ""
 
+                # Parse "＋新建「父 → 子」" or "＋新建「name」" or "电催化 → 高熵"
+                parent = None
                 if collection and collection.startswith("＋新建「"):
-                    collection = collection[4:-1]
-                    await meta.create_collection(collection)
+                    inner = collection[4:-1]
+                    if "→" in inner:
+                        parts = [p.strip() for p in inner.split("→", 1)]
+                        parent = parts[0]
+                        collection = parts[1] if len(parts) > 1 else inner
+                        await meta.create_collection(collection, parent=parent)
+                    else:
+                        collection = inner
+                        await meta.create_collection(collection)
+                elif "→" in collection:
+                    # Existing nested: "电催化 → 高熵"
+                    collection = collection.split("→")[-1].strip()
 
                 await meta.update_document_metadata(
                     result.document_id,
