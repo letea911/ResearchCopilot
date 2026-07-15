@@ -31,6 +31,18 @@ C:/ProgramData/anaconda3/python.exe -m cli.main ask "你的问题"
 
 ## 📋 每日开发日志 (Daily Dev Log)
 
+### 2026-07-15 (启动修复)
+- **今日目标**: 修复 GUI 启动慢 + 崩溃 + 分类不准
+- **完成事项**:
+  - ✅ **Fix 1**：模型加载优先本地文件（`local_files_only=True`），避免 HF 网络超时
+  - ✅ **Fix 2**：去掉 `library_panel._on_new_collection` 的 `run_until_complete`，改用 `ensure_future`（修 qasync 崩溃）
+  - ✅ **Fix 3**：父库/子库创建 UX 分离——按钮「＋新建父库」（直接建根级），右键父库→「＋新建子库」（建在其下）
+  - ✅ **Fix 4**：分类 prompt 强化——特定库优先，临时库/默认库仅作最后选择
+  - ✅ ChromaDB `initialize()` 改为真异步（`run_in_executor`）
+  - ✅ SQLite 迁移顺序修复（CREATE INDEX 移到 ALTER TABLE 之后）
+- **遇到问题**: ChromaDB + SQLite 两个阻塞串在一起导致启动完全卡死；SSH push 偶断
+- **明日计划**: 用户亲测所有功能；后续 Experiments 模块
+
 ### 2026-07-15 (Phase 9)
 - **今日目标**: Phase 9 库嵌套（两级父子引用）
 - **完成事项**:
