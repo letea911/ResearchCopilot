@@ -1,3 +1,4 @@
+import asyncio
 import chromadb
 from config.model import StorageConfig
 from storage.interfaces import BaseVectorStore
@@ -13,10 +14,18 @@ class ChromaVectorStore(BaseVectorStore):
         self._collection = None
 
     async def initialize(self):
-        self._client = chromadb.PersistentClient(path=self._persist_dir)
-        self._collection = self._client.get_or_create_collection(
-            name="research_documents"
-        )
+        # ChromaDB PersistentClient is a synchronous blocking call —
+        # it opens SQLite files and scans collections on disk.
+        # Run it in a thread so we don't freeze the event-loop (= UI) thread.
+        loop = asyncio.get_running_loop()
+
+        def _connect():
+            self._client = chromadb.PersistentClient(path=self._persist_dir)
+            self._collection = self._client.get_or_create_collection(
+                name="research_documents"
+            )
+
+        await loop.run_in_executor(None, _connect)
 
     async def add(self, docs: list[VectorDocument]) -> None:
         if not docs:
