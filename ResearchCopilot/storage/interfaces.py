@@ -82,6 +82,12 @@ class BaseMetadataStore(ABC):
         ...
 
     @abstractmethod
+    async def delete_collection(self, name: str, reassign_to: str = "默认库") -> int:
+        """Delete a library. Reassigns documents to `reassign_to`,
+        promotes sub-libraries to root level. Returns docs moved count."""
+        ...
+
+    @abstractmethod
     async def insert_chunks(self, chunks: list[ChunkRecord]) -> None:
         """Insert chunk records in batch."""
         ...

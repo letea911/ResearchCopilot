@@ -284,6 +284,41 @@ class SQLiteMetadataStore(BaseMetadataStore):
         await self._conn.commit()
         return True
 
+    async def delete_collection(self, name: str, reassign_to: str = "默认库") -> int:
+        """Delete a library. Moves its documents to `reassign_to`, promotes its
+        sub-libraries to root level. Returns the number of documents moved."""
+        name = (name or "").strip()
+        if not name:
+            return 0
+
+        # 1) Reassign documents to the target collection
+        cur = await self._conn.execute(
+            "UPDATE documents SET collection = ? WHERE collection = ?",
+            (reassign_to, name),
+        )
+        moved = cur.rowcount
+
+        # 2) Promote sub-libraries to root level
+        await self._conn.execute(
+            "UPDATE collections SET parent = NULL WHERE parent = ?", (name,)
+        )
+
+        # 3) Delete the collection itself
+        await self._conn.execute(
+            "DELETE FROM collections WHERE name = ?", (name,)
+        )
+
+        await self._conn.commit()
+
+        # Ensure reassign_to exists in collections
+        await self._conn.execute(
+            "INSERT OR IGNORE INTO collections (name, parent) VALUES (?, NULL)",
+            (reassign_to,),
+        )
+        await self._conn.commit()
+
+        return moved
+
     async def insert_chunks(self, chunks: list[ChunkRecord]) -> None:
         await self._conn.executemany(
             """INSERT INTO chunks (id, document_id, chunk_index, content,

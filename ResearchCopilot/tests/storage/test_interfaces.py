@@ -25,6 +25,7 @@ class FakeMetadataStore(BaseMetadataStore):
     async def expand_collections(self, names): return names
     async def create_collection(self, name, parent=None): pass
     async def rename_collection(self, old_name, new_name): return True
+    async def delete_collection(self, name, reassign_to="默认库"): return 0
     async def insert_chunks(self, chunks): pass
     async def get_chunks_by_document(self, document_id): return []
     async def get_chunk_by_chroma_id(self, chroma_id): return None
