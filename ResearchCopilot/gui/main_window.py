@@ -133,21 +133,28 @@ class MainWindow(QMainWindow):
         if dlg.was_saved():
             asyncio.ensure_future(self.library_panel.refresh(self.ctx))
 
-    def _on_export_to_list(self, name: str, doc_ids: list) -> None:
-        """聊天区导出勾选文献 → 创建阅读清单。"""
+    def _on_export_to_list(self, name: str, doc_ids: list, existing_list_id: str = "") -> None:
+        """聊天区导出勾选文献 → 创建/追加阅读清单。"""
         if self.ctx is None:
             return
-        asyncio.ensure_future(self._do_export_to_list(name, doc_ids))
+        asyncio.ensure_future(self._do_export_to_list(name, doc_ids, existing_list_id))
 
-    async def _do_export_to_list(self, name: str, doc_ids: list) -> None:
+    async def _do_export_to_list(self, name: str, doc_ids: list, existing_list_id: str = "") -> None:
         meta = self.ctx["meta_store"]
-        lid = await meta.create_reading_list(name)
-        if lid:
-            added = await meta.add_to_reading_list(lid, doc_ids)
-            self.set_status(f"已创建阅读清单「{name}」({added}篇)")
-            await self.library_panel.refresh(self.ctx)
+        if existing_list_id:
+            # Add to existing reading list
+            added = await meta.add_to_reading_list(existing_list_id, doc_ids)
+            self.set_status(f"已添加 {added} 篇到「{name}」")
         else:
-            self.set_status("创建清单失败")
+            # Create new reading list
+            lid = await meta.create_reading_list(name)
+            if lid:
+                added = await meta.add_to_reading_list(lid, doc_ids)
+                self.set_status(f"已创建阅读清单「{name}」({added}篇)")
+            else:
+                self.set_status("创建清单失败")
+                return
+        await self.library_panel.refresh(self.ctx)
 
     async def _ingest_file(self, path: str, collection: str = "默认库") -> None:
         if self.ctx is None:
