@@ -193,6 +193,8 @@ class LibraryPanel(QWidget):
         if doc_id:
             # Document node — always show full context menu
             menu = QMenu(self)
+            menu.addAction("📝 总结文献")
+            menu.addSeparator()
             menu.addAction("📄 打开PDF")
             menu.addAction("✏ 重命名")
             if list_id and not is_rl_header:
@@ -204,7 +206,10 @@ class LibraryPanel(QWidget):
                 return
             import asyncio
             action_text = action.text()
-            if action_text == "📄 打开PDF":
+            if action_text == "📝 总结文献":
+                title = (item.toolTip(0) or item.text(0)).split("\n", 1)[0]
+                self.summarize_requested.emit(doc_id, title)
+            elif action_text == "📄 打开PDF":
                 self._open_doc_pdf(doc_id)
             elif action_text == "✏ 重命名":
                 self._rename_document(item, doc_id)
