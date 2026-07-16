@@ -3,10 +3,59 @@ from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QPushButton,
     QTreeWidget, QTreeWidgetItem, QInputDialog, QFileDialog, QMessageBox,
-    QMenu, QAbstractItemView,
+    QMenu, QAbstractItemView, QApplication,
 )
 from PyQt5.QtGui import QDesktopServices
 from PyQt5.QtCore import QUrl
+
+
+class LibraryTreeWidget(QTreeWidget):
+    """QTreeWidget that emits signals on drop for cross-library moves.
+    We can't rely on the parent widget's dropEvent because Qt delivers drop
+    events to the innermost child under the cursor (the tree itself)."""
+
+    docs_moved = pyqtSignal(list, str)        # (doc_ids, target_collection)
+    docs_added_to_list = pyqtSignal(list, str)  # (doc_ids, list_id)
+
+    def dropEvent(self, event):
+        """Document(s) dropped onto a library or reading list node."""
+        target_item = self.itemAt(event.pos())
+        if target_item is None:
+            event.ignore()
+            return
+
+        target_col = target_item.data(0, Qt.UserRole + 1)  # library name
+        target_list_id = target_item.data(0, Qt.UserRole + 2)  # reading list id (if any)
+
+        if not target_col and not target_list_id:
+            # Maybe dropped on a document — walk up to its parent library/list
+            parent = target_item.parent()
+            if parent:
+                target_col = parent.data(0, Qt.UserRole + 1)
+                target_list_id = parent.data(0, Qt.UserRole + 2)
+
+        # Collect ALL selected document IDs (supports Shift/Ctrl multi-select)
+        doc_ids = []
+        for item in self.selectedItems():
+            did = item.data(0, Qt.UserRole)
+            if did:
+                doc_ids.append(did)
+
+        if not doc_ids:
+            event.ignore()
+            return
+
+        if target_list_id and target_list_id != "__reading_list_header__":
+            # Drop on a reading list → add docs to the virtual group
+            self.docs_added_to_list.emit(doc_ids, target_list_id)
+        elif target_col:
+            # Drop on a library → move docs to that collection
+            self.docs_moved.emit(doc_ids, target_col)
+        else:
+            event.ignore()
+            return
+
+        event.accept()
 
 
 class LibraryPanel(QWidget):
@@ -48,8 +97,9 @@ class LibraryPanel(QWidget):
         layout.addLayout(btn_row)
 
         # Tree: root libraries → sub-libraries → documents
-        self.tree = QTreeWidget()
+        self.tree = LibraryTreeWidget()
         self.tree.setHeaderHidden(True)
+        self.tree.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.tree.itemClicked.connect(self._on_item_clicked)
         self.tree.itemDoubleClicked.connect(self._on_item_double_clicked)
         self.tree.itemChanged.connect(self._on_item_changed)
@@ -59,7 +109,10 @@ class LibraryPanel(QWidget):
         self.tree.setDragEnabled(True)
         self.tree.setAcceptDrops(True)
         self.tree.setDropIndicatorShown(True)
-        self.tree.setDragDropMode(QAbstractItemView.InternalMove)
+        self.tree.setDragDropMode(QAbstractItemView.DragDrop)
+        # Connect cross-library move signals
+        self.tree.docs_moved.connect(self._on_docs_moved)
+        self.tree.docs_added_to_list.connect(self._on_docs_added_to_list)
         layout.addWidget(self.tree, stretch=1)
 
         hint = QLabel("单击文献总结 · 双击改名 · 右键更多 · 拖动换库")
@@ -330,41 +383,27 @@ class LibraryPanel(QWidget):
         await meta.delete_document(doc_id)
         await self.refresh()
 
-    # ---- Drag & drop: move document between libraries ----------------------
+    # ---- Drag & drop handlers (signal-driven from LibraryTreeWidget) --------
 
-    def dropEvent(self, event) -> None:
-        """Handle document dragged onto a library node → move to that library."""
-        target_item = self.tree.itemAt(event.pos())
-        if target_item is None or self.ctx is None:
-            event.ignore()
+    def _on_docs_moved(self, doc_ids: list, target_col: str) -> None:
+        """Slot: one or more documents dragged onto a library node."""
+        if self.ctx is None or not doc_ids:
             return
-
-        # Find the target collection name
-        target_col = target_item.data(0, Qt.UserRole + 1)  # sub-library or root name
-        if not target_col:
-            # Maybe dropped on a document inside a library — use its parent's collection
-            parent = target_item.parent()
-            if parent:
-                target_col = parent.data(0, Qt.UserRole + 1)
-
-        if not target_col:
-            event.ignore()
-            return
-
-        # Get dragged document IDs
-        doc_ids = []
-        for item in self.tree.selectedItems():
-            did = item.data(0, Qt.UserRole)
-            if did:
-                doc_ids.append(did)
-
-        if not doc_ids:
-            event.ignore()
-            return
-
         import asyncio
         asyncio.ensure_future(self._do_move_docs(doc_ids, target_col))
-        event.accept()
+
+    def _on_docs_added_to_list(self, doc_ids: list, list_id: str) -> None:
+        """Slot: one or more documents dragged onto a reading list node."""
+        if self.ctx is None or not doc_ids:
+            return
+        import asyncio
+        asyncio.ensure_future(self._do_add_to_list(doc_ids, list_id))
+
+    async def _do_add_to_list(self, doc_ids: list, list_id: str) -> None:
+        meta = self.ctx["meta_store"]
+        for did in doc_ids:
+            await meta.add_to_reading_list(list_id, [did])
+        await self.refresh()
 
     async def _do_move_docs(self, doc_ids: list[str], target_col: str) -> None:
         meta = self.ctx["meta_store"]
@@ -380,20 +419,15 @@ class LibraryPanel(QWidget):
                 pass
         await self.refresh()
 
-    # ----------------------------------------------------------------------
-        if self.ctx is None:
-            return
-        paths, _ = QFileDialog.getOpenFileNames(
-            self, "选择PDF文件（可多选）", "", "PDF 文件 (*.pdf)"
-        )
-        if paths:
-            self.import_requested.emit(self.target_collection(), list(paths))
-
     def _on_item_clicked(self, item: QTreeWidgetItem, _column: int) -> None:
-        """Single click on a document → summarize in chat panel."""
+        """Single click on a document → summarize in chat panel.
+        Skip when Ctrl/Shift is held (user is multi-selecting)."""
         doc_id = item.data(0, Qt.UserRole)
         if not doc_id:
             return  # library node, ignore single click
+        mods = QApplication.keyboardModifiers()
+        if mods & (Qt.ControlModifier | Qt.ShiftModifier):
+            return  # multi-selecting, don't summarize
         title = (item.toolTip(0) or item.text(0)).split("\n", 1)[0]
         self.summarize_requested.emit(doc_id, title)
 

@@ -167,6 +167,10 @@ class ChatPanel(QWidget):
 
     def _refresh_export_html(self) -> None:
         """Rewrite citation toggle links to reflect current selection state."""
+        # Save scroll position — setHtml() resets it to top
+        vbar = self.browser.verticalScrollBar()
+        scroll_pos = vbar.value()
+
         html_text = self.browser.toHtml()
         for i in range(len(self._export_citations)):
             selected = i in self._export_selected
@@ -189,6 +193,8 @@ class ChatPanel(QWidget):
                     f'>[ ] 标记导出</a>',
                 )
         self.browser.setHtml(html_text)
+        # Restore scroll position
+        vbar.setValue(scroll_pos)
         self._update_export_btn()
 
     def _update_export_btn(self) -> None:
