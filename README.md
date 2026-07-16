@@ -31,6 +31,39 @@ C:/ProgramData/anaconda3/python.exe -m cli.main ask "你的问题"
 
 ## 📋 每日开发日志 (Daily Dev Log)
 
+### 2026-07-16 (文献列表区功能完善)
+- **今日目标**: 完善文献列表交互；修复导出功能
+- **完成事项**:
+  - ✅ **文献交互重构**：单击文献→总结；双击文献→改名；右键文献→打开PDF/重命名/删除（二次确认）
+  - ✅ **拖动换库**：拖动文献到另一个库→自动更新 collection + 向量 metadata
+  - ✅ **文献删除**：`delete_document` API — 级联删除 chunks + 向量 + 阅读清单引用
+  - ✅ **`update_document_metadata` 加 `title` 参数**（支持文献改名回写 SQLite）
+  - ✅ **导出修复**：cite doc_id 改用 `getattr(c, "document_id")`；新增"添加到已有清单"选项
+  - ✅ **引用去重**：`chat.py` 按 `document_id` 去重，同一篇论文只显示一条引用
+  - ✅ **勾选修复**：URL 解析改用 `url.toString().split(":")`；标记改用 ASCII-safe `[ ]` / `[x]`
+  - ✅ 恢复误删的 `_on_import_clicked`（修启动崩溃）
+  - ✅ 测试 91/91 PASS
+- **遇到问题**: 编辑时误删 `_on_import_clicked` 方法导致 GUI 启动崩溃；SSH 间歇性超时
+
+### 2026-07-15 (阅读清单一键分组)
+- **今日目标**: Phase 10 — 聊天区引用一键导出为虚拟阅读分组
+- **完成事项**:
+  - ✅ **设计 spec**：`docs/superpowers/specs/2026-07-15-reading-lists-design.md`
+  - ✅ **存储层**：`reading_lists` + `reading_list_items` 两张新表，7 个 CRUD 方法
+  - ✅ **chat_panel**：每条引用后加 `[ ] 标记导出` 链接（点击切换 `[x] 已选`），底部导出按钮
+  - ✅ **library_panel**：树底部"📋 阅读清单"分区，右键重命名/删除/从清单移除
+  - ✅ **main_window**：连接 `export_to_list_requested` → 创建清单 + 刷新树
+  - ✅ 测试 91/91 PASS
+- **遇到问题**: 引用 `[ ]` 勾选不灵 —— `url.host()` 对 `select:0` 返回空 + `☐` unicode 被 Qt HTML 编码破坏匹配
+
+### 2026-07-15 (分类器 prompt 两步推理 + 防临时库)
+- **今日目标**: 修复 AI 分类器总选"临时库"的问题
+- **完成事项**:
+  - ✅ **Prompt 两步推理**：Step 1 提取关键词理解论文 → Step 2 用关键词语义匹配库名
+  - ✅ **Prompt 分层标记**：特定库排上面，临时库/默认库标注 `⚠ LAST RESORT — avoid if possible`
+  - ✅ **Dialog 防线**：combo 第 0 项改为 `⚠ 请手动选择…` 占位，通用库排最后，保存时跳过未选行
+  - ✅ 测试 91/91 PASS
+
 ### 2026-07-15 (启动修复 + 删除库)
 - **今日目标**: 修复 GUI 启动慢 + 崩溃 + 分类不准；添加删除库功能；修复父库文献消失
 - **完成事项**:
@@ -181,3 +214,5 @@ C:/ProgramData/anaconda3/python.exe -m cli.main ask "你的问题"
 
 > 模板：每天复制上一日格式，填写当日内容。
 
+
+在每次回复前叫宝贝
