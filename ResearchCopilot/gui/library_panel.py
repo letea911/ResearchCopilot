@@ -3,8 +3,10 @@ from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QPushButton,
     QTreeWidget, QTreeWidgetItem, QInputDialog, QFileDialog, QMessageBox,
-    QMenu,
+    QMenu, QAbstractItemView,
 )
+from PyQt5.QtGui import QDesktopServices
+from PyQt5.QtCore import QUrl
 
 
 class LibraryPanel(QWidget):
@@ -48,13 +50,19 @@ class LibraryPanel(QWidget):
         # Tree: root libraries → sub-libraries → documents
         self.tree = QTreeWidget()
         self.tree.setHeaderHidden(True)
+        self.tree.itemClicked.connect(self._on_item_clicked)
         self.tree.itemDoubleClicked.connect(self._on_item_double_clicked)
         self.tree.itemChanged.connect(self._on_item_changed)
         self.tree.setContextMenuPolicy(Qt.CustomContextMenu)
         self.tree.customContextMenuRequested.connect(self._on_context_menu)
+        # Drag & drop: allow documents to be dragged between libraries
+        self.tree.setDragEnabled(True)
+        self.tree.setAcceptDrops(True)
+        self.tree.setDropIndicatorShown(True)
+        self.tree.setDragDropMode(QAbstractItemView.InternalMove)
         layout.addWidget(self.tree, stretch=1)
 
-        hint = QLabel("勾选库限定检索范围（不勾=全部）。双击库名可重命名。右键父库可新建子库。")
+        hint = QLabel("单击文献总结 · 双击改名 · 右键更多 · 拖动换库")
         hint.setStyleSheet("color: #999; font-size: 11px;")
         layout.addWidget(hint)
 
@@ -130,17 +138,27 @@ class LibraryPanel(QWidget):
         is_rl_header = list_id == "__reading_list_header__"
 
         if doc_id:
-            # Document node — check if it's in a reading list
+            # Document node — always show full context menu
+            menu = QMenu(self)
+            menu.addAction("📄 打开PDF")
+            menu.addAction("✏ 重命名")
             if list_id and not is_rl_header:
-                menu = QMenu(self)
-                pdf_action = menu.addAction("📄 跳转PDF")
-                remove_action = menu.addAction("从清单移除")
-                action = menu.exec_(self.tree.viewport().mapToGlobal(pos))
-                if action == pdf_action:
-                    self._open_doc_pdf(doc_id)
-                elif action == remove_action:
-                    import asyncio
-                    asyncio.ensure_future(self._do_remove_from_list(list_id, doc_id))
+                menu.addAction("从清单移除")
+            menu.addSeparator()
+            menu.addAction("🗑 删除文献")
+            action = menu.exec_(self.tree.viewport().mapToGlobal(pos))
+            if action is None:
+                return
+            import asyncio
+            action_text = action.text()
+            if action_text == "📄 打开PDF":
+                self._open_doc_pdf(doc_id)
+            elif action_text == "✏ 重命名":
+                self._rename_document(item, doc_id)
+            elif action_text == "从清单移除":
+                asyncio.ensure_future(self._do_remove_from_list(list_id, doc_id))
+            elif action_text == "🗑 删除文献":
+                self._on_delete_document(item, doc_id)
             return
 
         if not lib_name or is_rl_header:
@@ -266,7 +284,103 @@ class LibraryPanel(QWidget):
         if idx >= 0:
             self.target_combo.setCurrentIndex(idx)
 
-    def _on_import_clicked(self) -> None:
+    # ---- Document actions --------------------------------------------------
+
+    def _rename_document(self, item: QTreeWidgetItem, doc_id: str) -> None:
+        """Double-click document → rename its title."""
+        old_title = (item.toolTip(0) or item.text(0)).split("\n", 1)[0]
+        new_title, ok = QInputDialog.getText(
+            self, "重命名文献", "新标题：", text=old_title
+        )
+        new_title = (new_title or "").strip()
+        if not ok or not new_title or new_title == old_title:
+            return
+        import asyncio
+        asyncio.ensure_future(self._do_rename_doc(doc_id, new_title))
+
+    async def _do_rename_doc(self, doc_id: str, new_title: str) -> None:
+        meta = self.ctx["meta_store"]
+        await meta.update_document_metadata(doc_id, title=new_title)
+        await self.refresh()
+
+    def _on_delete_document(self, item: QTreeWidgetItem, doc_id: str) -> None:
+        """Right-click → delete document after confirmation."""
+        title = (item.toolTip(0) or item.text(0)).split("\n", 1)[0]
+        reply = QMessageBox.question(
+            self, "确认删除",
+            f"删除文献「{title[:60]}」？\n\n此操作不可撤销，文献将从库中移除。",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+        )
+        if reply != QMessageBox.Yes:
+            return
+        import asyncio
+        asyncio.ensure_future(self._do_delete_doc(doc_id))
+
+    async def _do_delete_doc(self, doc_id: str) -> None:
+        meta = self.ctx["meta_store"]
+        vec = self.ctx["vector_store"]
+        # Get chunks to delete vectors
+        chunks = await meta.get_chunks_by_document(doc_id)
+        chroma_ids = [c.chroma_id for c in chunks if c.chroma_id]
+        if chroma_ids:
+            try:
+                await vec.delete(chroma_ids)
+            except Exception:
+                pass
+        await meta.delete_document(doc_id)
+        await self.refresh()
+
+    # ---- Drag & drop: move document between libraries ----------------------
+
+    def dropEvent(self, event) -> None:
+        """Handle document dragged onto a library node → move to that library."""
+        target_item = self.tree.itemAt(event.pos())
+        if target_item is None or self.ctx is None:
+            event.ignore()
+            return
+
+        # Find the target collection name
+        target_col = target_item.data(0, Qt.UserRole + 1)  # sub-library or root name
+        if not target_col:
+            # Maybe dropped on a document inside a library — use its parent's collection
+            parent = target_item.parent()
+            if parent:
+                target_col = parent.data(0, Qt.UserRole + 1)
+
+        if not target_col:
+            event.ignore()
+            return
+
+        # Get dragged document IDs
+        doc_ids = []
+        for item in self.tree.selectedItems():
+            did = item.data(0, Qt.UserRole)
+            if did:
+                doc_ids.append(did)
+
+        if not doc_ids:
+            event.ignore()
+            return
+
+        import asyncio
+        asyncio.ensure_future(self._do_move_docs(doc_ids, target_col))
+        event.accept()
+
+    async def _do_move_docs(self, doc_ids: list[str], target_col: str) -> None:
+        meta = self.ctx["meta_store"]
+        vec = self.ctx["vector_store"]
+        for did in doc_ids:
+            await meta.update_document_metadata(did, collection=target_col)
+            try:
+                await vec.update_metadata_by_filter(
+                    where={"document_id": did},
+                    updates={"collection": target_col},
+                )
+            except Exception:
+                pass
+        await self.refresh()
+
+    # ----------------------------------------------------------------------
         if self.ctx is None:
             return
         paths, _ = QFileDialog.getOpenFileNames(
@@ -275,14 +389,22 @@ class LibraryPanel(QWidget):
         if paths:
             self.import_requested.emit(self.target_collection(), list(paths))
 
-    def _on_item_double_clicked(self, item: QTreeWidgetItem, _column: int) -> None:
+    def _on_item_clicked(self, item: QTreeWidgetItem, _column: int) -> None:
+        """Single click on a document → summarize in chat panel."""
         doc_id = item.data(0, Qt.UserRole)
         if not doc_id:
-            # Library node (root or sub) — rename
-            self._rename_library(item)
-            return
+            return  # library node, ignore single click
         title = (item.toolTip(0) or item.text(0)).split("\n", 1)[0]
         self.summarize_requested.emit(doc_id, title)
+
+    def _on_item_double_clicked(self, item: QTreeWidgetItem, _column: int) -> None:
+        doc_id = item.data(0, Qt.UserRole)
+        if doc_id:
+            # Document node — rename title
+            self._rename_document(item, doc_id)
+            return
+        # Library node — rename library
+        self._rename_library(item)
 
     def _rename_library(self, item: QTreeWidgetItem) -> None:
         if self.ctx is None:
