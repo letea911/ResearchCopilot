@@ -137,7 +137,7 @@ class ChatPanel(QWidget):
             for i, c in enumerate(result.citations, start=1):
                 # Store for export
                 self._export_citations.append({
-                    "doc_id": c.doc_id if hasattr(c, "doc_id") and c.doc_id else "",
+                    "doc_id": getattr(c, "document_id", ""),
                     "title": c.title or "Unknown",
                     "file_path": c.file_path or "",
                 })
@@ -206,21 +206,65 @@ class ChatPanel(QWidget):
     def _on_export_clicked(self) -> None:
         if not self._export_selected or self.ctx is None:
             return
-        name, ok = QInputDialog.getText(
-            self, "导出为分组", "新分组名称："
-        )
-        name = (name or "").strip()
-        if not ok or not name:
-            return
         doc_ids = [
             self._export_citations[i]["doc_id"]
             for i in sorted(self._export_selected)
             if self._export_citations[i].get("doc_id")
         ]
-        if doc_ids:
+        if not doc_ids:
+            return
+
+        # Ask: new list or existing?
+        import asyncio
+        items = ["＋ 新建清单", "＋ 添加到已有清单"]
+        choice, ok = QInputDialog.getItem(
+            self, "导出为分组", "选择操作：", items, 0, False,
+        )
+        if not ok or not choice:
+            return
+
+        if choice == items[0]:
+            # New list
+            name, ok2 = QInputDialog.getText(
+                self, "导出为分组", "新分组名称："
+            )
+            name = (name or "").strip()
+            if not ok2 or not name:
+                return
             self.export_to_list_requested.emit(name, doc_ids)
             self.export_btn.setText("✅ 已导出")
             self.export_btn.setEnabled(False)
+        else:
+            # Existing list — fetch and let user pick
+            asyncio.ensure_future(self._pick_and_export(doc_ids))
+
+    async def _pick_and_export(self, doc_ids: list) -> None:
+        meta = self.ctx["meta_store"]
+        lists = await meta.get_reading_lists()
+        if not lists:
+            # No existing lists → fall back to new
+            name, ok = QInputDialog.getText(
+                self, "导出为分组", "没有已有清单，输入新分组名称："
+            )
+            name = (name or "").strip()
+            if ok and name:
+                self.export_to_list_requested.emit(name, doc_ids)
+                self.export_btn.setText("✅ 已导出")
+                self.export_btn.setEnabled(False)
+            return
+
+        names = [rl["name"] for rl in lists]
+        choice, ok = QInputDialog.getItem(
+            self, "添加到已有清单", "选择清单：", names, 0, False,
+        )
+        if ok and choice:
+            # Find the list ID
+            lid = next((rl["id"] for rl in lists if rl["name"] == choice), "")
+            if lid and doc_ids:
+                import asyncio as _asyncio
+                added = await meta.add_to_reading_list(lid, doc_ids)
+                self.export_btn.setText(f"✅ 已添加 {added} 篇到「{choice}」")
+                self.export_btn.setEnabled(False)
 
     async def _ask(self, question: str) -> None:
         self.set_input_enabled(False)
