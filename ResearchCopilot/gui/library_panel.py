@@ -115,7 +115,7 @@ class LibraryPanel(QWidget):
         self.tree.docs_added_to_list.connect(self._on_docs_added_to_list)
         layout.addWidget(self.tree, stretch=1)
 
-        hint = QLabel("单击文献总结 · 双击改名 · 右键更多 · 拖动换库")
+        hint = QLabel("单击选中 · 双击改名 · 右键更多 · 拖动换库 · 聊天框输入指令总结")
         hint.setStyleSheet("color: #999; font-size: 11px;")
         layout.addWidget(hint)
 
@@ -420,16 +420,11 @@ class LibraryPanel(QWidget):
         await self.refresh()
 
     def _on_item_clicked(self, item: QTreeWidgetItem, _column: int) -> None:
-        """Single click on a document → summarize in chat panel.
-        Skip when Ctrl/Shift is held (user is multi-selecting)."""
-        doc_id = item.data(0, Qt.UserRole)
-        if not doc_id:
-            return  # library node, ignore single click
-        mods = QApplication.keyboardModifiers()
-        if mods & (Qt.ControlModifier | Qt.ShiftModifier):
-            return  # multi-selecting, don't summarize
-        title = (item.toolTip(0) or item.text(0)).split("\n", 1)[0]
-        self.summarize_requested.emit(doc_id, title)
+        """Single click selects the item. Summarize is triggered by typing
+        instructions in the chat panel, not by clicking here."""
+        # No-op — click is for selection only (supports Shift/Ctrl multi-select).
+        # Summarize is handled via the chat input dialog.
+        pass
 
     def _on_import_clicked(self) -> None:
         if self.ctx is None:

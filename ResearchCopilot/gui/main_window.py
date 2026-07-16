@@ -81,6 +81,7 @@ class MainWindow(QMainWindow):
         self.ctx = ctx
         self.chat_panel.set_context(ctx)
         self.chat_panel.set_collections_provider(self.library_panel.selected_collections)
+        self.chat_panel.set_selected_docs_provider(self.library_panel.get_selected_doc_ids)
         self.library_panel.set_context(ctx)
         await self.library_panel.refresh(ctx)
 

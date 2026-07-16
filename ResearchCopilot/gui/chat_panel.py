@@ -22,6 +22,7 @@ class ChatPanel(QWidget):
         self.ctx = None
         self.history: list[ChatMessage] = []
         self._collections_provider = None  # callable -> list[str] | None
+        self._selected_docs_provider = None  # callable -> list[str]
 
         # Citation export tracking — per-question selection state
         self._export_citations: list[dict] = []   # [{doc_id, title, file_path}]
@@ -94,6 +95,10 @@ class ChatPanel(QWidget):
         (list[str] or None = all) so questions can be scoped to them."""
         self._collections_provider = provider
 
+    def set_selected_docs_provider(self, provider) -> None:
+        """Register a callback returning currently-selected doc IDs (list[str])."""
+        self._selected_docs_provider = provider
+
     def _current_collections(self):
         if self._collections_provider is None:
             return None
@@ -102,6 +107,14 @@ class ChatPanel(QWidget):
         except Exception:
             return None
 
+    def _current_selected_docs(self) -> list[str]:
+        if self._selected_docs_provider is None:
+            return []
+        try:
+            return self._selected_docs_provider()
+        except Exception:
+            return []
+
     def _on_send(self) -> None:
         if self.ctx is None:
             return
@@ -109,8 +122,38 @@ class ChatPanel(QWidget):
         if not question:
             return
         self.input.clear()
+
+        # Detect summarize command for selected documents
+        if question in ("总结", "总结这篇", "总结选中的文献", "/summary"):
+            doc_ids = self._current_selected_docs()
+            if doc_ids:
+                titles = []
+                for did in doc_ids:
+                    import asyncio as _asyncio
+                    _asyncio.ensure_future(self._summarize_selected(did))
+                self.browser.append(
+                    f"<b>你：</b> 总结选中的 {len(doc_ids)} 篇文献"
+                )
+                self._scroll_to_bottom()
+                return
+            else:
+                self.browser.append(
+                    "<b>你：</b> 总结<br>"
+                    "<span style='color:#888;'>（请先在左侧文献树中选中要总结的文献）</span>"
+                )
+                return
+
         self.browser.append(f"<b>你：</b> {html.escape(question)}")
         asyncio.ensure_future(self._ask(question))
+
+    async def _summarize_selected(self, doc_id: str) -> None:
+        """Summarize one selected document (called from _on_send command)."""
+        doc = await self.ctx["meta_store"].get_document(doc_id)
+        title = doc.title if doc else doc_id
+        self.browser.append(f"<b>你：</b> 总结这篇 —— {html.escape(title or '')}")
+        self.browser.append("<i>思考中…</i>")
+        self._scroll_to_bottom()
+        await self._summarize(doc_id)
 
     def _scroll_to_bottom(self) -> None:
         bar = self.browser.verticalScrollBar()
