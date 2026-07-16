@@ -397,6 +397,15 @@ class LibraryPanel(QWidget):
         title = (item.toolTip(0) or item.text(0)).split("\n", 1)[0]
         self.summarize_requested.emit(doc_id, title)
 
+    def _on_import_clicked(self) -> None:
+        if self.ctx is None:
+            return
+        paths, _ = QFileDialog.getOpenFileNames(
+            self, "选择PDF文件（可多选）", "", "PDF 文件 (*.pdf)"
+        )
+        if paths:
+            self.import_requested.emit(self.target_collection(), list(paths))
+
     def _on_item_double_clicked(self, item: QTreeWidgetItem, _column: int) -> None:
         doc_id = item.data(0, Qt.UserRole)
         if doc_id:
