@@ -358,14 +358,12 @@ class SQLiteMetadataStore(BaseMetadataStore):
             return 0
         added = 0
         for did in document_ids:
-            try:
-                await self._conn.execute(
-                    "INSERT OR IGNORE INTO reading_list_items (list_id, document_id, added_at) VALUES (?, ?, '')",
-                    (list_id, did),
-                )
+            cur = await self._conn.execute(
+                "INSERT OR IGNORE INTO reading_list_items (list_id, document_id, added_at) VALUES (?, ?, '')",
+                (list_id, did),
+            )
+            if cur.rowcount > 0:
                 added += 1
-            except Exception:
-                pass
         await self._conn.commit()
         return added
 
