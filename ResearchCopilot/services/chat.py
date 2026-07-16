@@ -93,10 +93,18 @@ class ChatService(BaseChatService):
                     if rec:
                         chunk_meta[chunk.chunk_id] = (rec.section, rec.page_number)
 
-        # 7. Build citations from retrieved sources
-        citations = [
-            Citation(
-                document_id=chunk.document_id,
+        # 7. Build citations from retrieved sources — deduplicated by document_id.
+        #    Multiple chunks from the same paper only generate one citation entry,
+        #    keeping the first chunk's section/page as the anchor reference.
+        seen_docs: set[str] = set()
+        citations: list[Citation] = []
+        for chunk in retrieved:
+            did = chunk.document_id
+            if did in seen_docs:
+                continue
+            seen_docs.add(did)
+            citations.append(Citation(
+                document_id=did,
                 title=chunk.metadata.get("title", "Unknown"),
                 authors=chunk.metadata.get("authors", ""),
                 year=chunk.metadata.get("year"),
@@ -107,10 +115,8 @@ class ChatService(BaseChatService):
                     or chunk_meta.get(chunk.chunk_id, (None, None))[1],
                 section=chunk.metadata.get("section")
                     or chunk_meta.get(chunk.chunk_id, (None, None))[0],
-                file_path=file_paths.get(chunk.document_id),
-            )
-            for chunk in retrieved
-        ]
+                file_path=file_paths.get(did),
+            ))
 
         return ServiceResponse(answer=answer, citations=citations, sources=retrieved)
 
