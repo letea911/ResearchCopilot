@@ -146,8 +146,14 @@ class BaseMetadataStore(ABC):
         keywords: str | None = None,
         abstract: str | None = None,
         collection: str | None = None,
+        title: str | None = None,
     ) -> None:
         """Update only the provided (non-None) metadata fields of a document."""
+        ...
+
+    @abstractmethod
+    async def delete_document(self, document_id: str) -> None:
+        """Delete a document and its chunks from the metadata store."""
         ...
 
 

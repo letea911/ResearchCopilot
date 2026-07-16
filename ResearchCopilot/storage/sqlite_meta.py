@@ -474,10 +474,13 @@ class SQLiteMetadataStore(BaseMetadataStore):
 
     async def update_document_metadata(
         self, document_id, authors=None, year=None, journal=None, doi=None,
-        keywords=None, abstract=None, collection=None,
+        keywords=None, abstract=None, collection=None, title=None,
     ) -> None:
         needs_fts_rebuild = False
         sets, params = [], []
+        if title is not None:
+            sets.append("title = ?"); params.append(title)
+            needs_fts_rebuild = True
         if authors is not None:
             sets.append("authors = ?"); params.append(authors)
         if year is not None:
@@ -504,6 +507,22 @@ class SQLiteMetadataStore(BaseMetadataStore):
             await self._conn.execute(
                 "INSERT INTO documents_fts(documents_fts) VALUES('rebuild')"
             )
+        await self._conn.commit()
+
+    async def delete_document(self, document_id: str) -> None:
+        """Delete a document and its chunks. Caller should also delete vectors."""
+        await self._conn.execute(
+            "DELETE FROM chunks WHERE document_id = ?", (document_id,)
+        )
+        await self._conn.execute(
+            "DELETE FROM documents WHERE id = ?", (document_id,)
+        )
+        await self._conn.execute(
+            "DELETE FROM reading_list_items WHERE document_id = ?", (document_id,)
+        )
+        await self._conn.execute(
+            "INSERT INTO documents_fts(documents_fts) VALUES('rebuild')"
+        )
         await self._conn.commit()
 
     def _row_to_document(self, row) -> DocumentRecord:
