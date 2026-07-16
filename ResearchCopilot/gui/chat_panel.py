@@ -69,15 +69,20 @@ class ChatPanel(QWidget):
         scheme = url.scheme()
         if scheme == "file":
             QDesktopServices.openUrl(url)
-        elif scheme == "select":
-            idx = int(url.host()) if url.host() else -1
+        elif scheme in ("select", "deselect"):
+            # Custom URLs like select:0 or deselect:2 — QUrl puts the index
+            # in path(), not host(). Parse the numeric suffix directly.
+            raw = url.toString()
+            try:
+                idx = int(raw.split(":", 1)[1]) if ":" in raw else -1
+            except (ValueError, IndexError):
+                return
             if 0 <= idx < len(self._export_citations):
-                self._export_selected.add(idx)
+                if scheme == "select":
+                    self._export_selected.add(idx)
+                else:
+                    self._export_selected.discard(idx)
                 self._refresh_export_html()
-        elif scheme == "deselect":
-            idx = int(url.host()) if url.host() else -1
-            self._export_selected.discard(idx)
-            self._refresh_export_html()
 
     def set_context(self, ctx: dict) -> None:
         self.ctx = ctx
@@ -149,10 +154,11 @@ class ChatPanel(QWidget):
                 if c.file_path:
                     url = "file:///" + str(c.file_path).replace("\\", "/")
                     line += f'  <a href="{url}">📄 打开PDF</a>'
-                # Toggle link for export selection
+                # Toggle link for export selection — use ASCII-safe markers
+                # so _refresh_export_html() replacements survive Qt's HTML encoding.
                 line += (
                     f'  <a href="select:{idx}" style="color:#888; '
-                    f'text-decoration:none;">☐ 标记导出</a>'
+                    f'text-decoration:none;">[ ] 标记导出</a>'
                 )
                 self.browser.append(line)
         self._update_export_btn()
@@ -160,9 +166,6 @@ class ChatPanel(QWidget):
 
     def _refresh_export_html(self) -> None:
         """Rewrite citation toggle links to reflect current selection state."""
-        cursor = self.browser.textCursor()
-        cursor.movePosition(QTextCursor.Start)
-        # Gather all HTML, replace select:/deselect: markers, restore
         html_text = self.browser.toHtml()
         for i in range(len(self._export_citations)):
             selected = i in self._export_selected
@@ -172,8 +175,8 @@ class ChatPanel(QWidget):
                     f'href="deselect:{i}"',
                 )
                 html_text = html_text.replace(
-                    f'>☐ 标记导出</a>',
-                    f'>☑ 已选</a>',
+                    f'>[ ] 标记导出</a>',
+                    f'>[x] 已选</a>',
                 )
             else:
                 html_text = html_text.replace(
@@ -181,8 +184,8 @@ class ChatPanel(QWidget):
                     f'href="select:{i}"',
                 )
                 html_text = html_text.replace(
-                    f'>☑ 已选</a>',
-                    f'>☐ 标记导出</a>',
+                    f'>[x] 已选</a>',
+                    f'>[ ] 标记导出</a>',
                 )
         self.browser.setHtml(html_text)
         self._update_export_btn()
